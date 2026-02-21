@@ -17,6 +17,10 @@ var LAYER_COLORS = [
 // Initialization
 // ==========================================
 document.addEventListener('DOMContentLoaded', async function() {
+    // Initialize Thai Buddhist Era date pickers
+    ThaiDatePicker.init('#detailStartDate');
+    ThaiDatePicker.init('#detailEndDate');
+
     await loadDetailZones();
     await loadDetailLayers();
 });

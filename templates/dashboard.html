@@ -10,7 +10,34 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <!-- Leaflet -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        /* Branch marker tooltip styling */
+        .branch-tooltip {
+            background: rgba(255,255,255,0.97) !important;
+            border: 1px solid #ddd !important;
+            border-radius: 8px !important;
+            padding: 0 !important;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.15) !important;
+            font-family: 'IBM Plex Sans Thai', sans-serif !important;
+        }
+        .branch-tooltip .leaflet-tooltip-content { padding: 8px 12px; }
+        .branch-tooltip::before { border-top-color: #ddd !important; }
+        /* Pagination controls */
+        #fullTablePagination {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 16px;
+            border-top: 1px solid var(--border);
+        }
+        #fullTablePagination button:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+    </style>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🗺️</text></svg>">
 </head>
 <body>
@@ -191,7 +218,7 @@
                 </div>
             </div>
             <div class="card-body p-0">
-                <div class="table-wrapper" style="max-height:500px;">
+                <div class="table-wrapper">
                     <table class="data-table" id="fullTable">
                         <thead>
                             <tr id="fullTableHeader">
@@ -206,6 +233,7 @@
                         </tfoot>
                     </table>
                 </div>
+                <div id="fullTablePagination"></div>
             </div>
         </div>
 
@@ -214,7 +242,7 @@
     <!-- Footer -->
     <footer class="max-w-screen-2xl mx-auto px-4 py-6 text-center relative z-10">
         <p class="text-xs" style="color: var(--text-muted);">
-            PWA GIS Online Tracking Dashboard © 2025 — Provincial Waterworks Authority
+            PWA GIS Online Tracking Dashboard © 2026 — Provincial Waterworks Authority
         </p>
     </footer>
 

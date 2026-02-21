@@ -161,6 +161,7 @@ func GetDashboardSummary(c *gin.Context) {
 		Zone       string           `json:"zone"`
 		Layers     map[string]int64 `json:"layers"`
 		Total      int64            `json:"total"`
+		PipeLong   float64          `json:"pipe_long"`
 	}
 
 	results := make(chan branchResult, len(officeList))
@@ -180,7 +181,8 @@ func GetDashboardSummary(c *gin.Context) {
 			for _, cnt := range layers {
 				total += cnt
 			}
-			results <- branchResult{PwaCode: pwa, BranchName: name, Zone: z, Layers: layers, Total: total}
+			pipeLong, _ := services.SumPipeLength(pwa, startDate, endDate)
+			results <- branchResult{PwaCode: pwa, BranchName: name, Zone: z, Layers: layers, Total: total, PipeLong: pipeLong}
 		}(o.PwaCode, o.Name, o.Zone)
 	}
 
@@ -292,10 +294,15 @@ func ExportExcel(c *gin.Context) {
 	sheet := "GIS Summary"
 	f.SetSheetName("Sheet1", sheet)
 
-	// Build header row
+	// Build header row: insert "Pipe Length(m)" right after "pipe" layer
 	headers := []string{"No.", "Branch Code", "Branch Name", "Zone"}
-	for _, l := range layers {
+	pipeColOffset := -1
+	for i, l := range layers {
 		headers = append(headers, services.GetLayerDisplayName(l))
+		if l == "pipe" {
+			headers = append(headers, "ความยาวท่อ(ม.)")
+			pipeColOffset = i
+		}
 	}
 	headers = append(headers, "Total")
 
@@ -322,12 +329,13 @@ func ExportExcel(c *gin.Context) {
 	// Fetch data concurrently
 	sem := make(chan struct{}, 10)
 	type rowData struct {
-		Index   int
-		PwaCode string
-		Name    string
-		Zone    string
-		Layers  map[string]int64
-		Total   int64
+		Index    int
+		PwaCode  string
+		Name     string
+		Zone     string
+		Layers   map[string]int64
+		Total    int64
+		PipeLong float64
 	}
 
 	rowChan := make(chan rowData, len(officeList))
@@ -340,7 +348,8 @@ func ExportExcel(c *gin.Context) {
 			for _, cnt := range layerCounts {
 				total += cnt
 			}
-			rowChan <- rowData{Index: idx, PwaCode: pwa, Name: name, Zone: z, Layers: layerCounts, Total: total}
+			pipeLong, _ := services.SumPipeLength(pwa, startDate, endDate)
+			rowChan <- rowData{Index: idx, PwaCode: pwa, Name: name, Zone: z, Layers: layerCounts, Total: total, PipeLong: pipeLong}
 		}(i, o.PwaCode, o.Name, o.Zone)
 	}
 
@@ -350,7 +359,7 @@ func ExportExcel(c *gin.Context) {
 		rows[r.Index] = r
 	}
 
-	// Write data rows
+	// Write data rows (pipe_long inserted after pipe layer column)
 	for i, r := range rows {
 		row := i + 2
 		f.SetCellValue(sheet, fmt.Sprintf("A%d", row), i+1)
@@ -358,11 +367,18 @@ func ExportExcel(c *gin.Context) {
 		f.SetCellValue(sheet, fmt.Sprintf("C%d", row), r.Name)
 		f.SetCellValue(sheet, fmt.Sprintf("D%d", row), r.Zone)
 
+		col := 5 // Start at column E
 		for j, l := range layers {
-			cell, _ := excelize.CoordinatesToCellName(j+5, row)
+			cell, _ := excelize.CoordinatesToCellName(col, row)
 			f.SetCellValue(sheet, cell, r.Layers[l])
+			col++
+			if j == pipeColOffset {
+				plCell, _ := excelize.CoordinatesToCellName(col, row)
+				f.SetCellValue(sheet, plCell, r.PipeLong)
+				col++
+			}
 		}
-		totalCell, _ := excelize.CoordinatesToCellName(len(layers)+5, row)
+		totalCell, _ := excelize.CoordinatesToCellName(col, row)
 		f.SetCellValue(sheet, totalCell, r.Total)
 	}
 

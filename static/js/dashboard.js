@@ -15,6 +15,12 @@ var layerNames = [];
 var zoneMap = null;
 var zoneMarkers = {};
 var branchMarkerLayer = null;
+var branchMarkerMap = {};   // pwa_code -> { marker, office }
+
+// Pagination for full data table
+var fullTablePage = 1;
+var ROWS_PER_PAGE = 20;
+var fullTableSorted = [];
 
 // Color palette for zones (indexed by zone number - 1)
 var ZONE_COLORS = [
@@ -188,16 +194,21 @@ function initZoneMap() {
  * Load branch markers with real coordinates from PostgreSQL wkb_geometry.
  * Each branch is shown as a small colored dot on the map.
  */
+/**
+ * Load branch markers from /api/offices/geom.
+ * Uses FontAwesome house-flood-water icon colored by zone.
+ * Stores markers for hover tooltip enrichment after dashboard loads.
+ */
 async function loadBranchMarkers() {
     try {
         var data = await apiGet('/api/offices/geom');
         if (!data.data || !zoneMap) return;
 
         branchMarkerLayer = L.layerGroup().addTo(zoneMap);
+        branchMarkerMap = {};
 
         data.data.forEach(function(office) {
             if (!office.lat || !office.lng) return;
-            // Sanity check: Thailand bounds (lat ~5-21, lng ~97-106)
             if (office.lat < 4 || office.lat > 22 || office.lng < 96 || office.lng > 107) return;
 
             var zoneIdx = parseInt(office.zone) - 1;
@@ -206,28 +217,88 @@ async function loadBranchMarkers() {
             var icon = L.divIcon({
                 className: 'branch-marker',
                 html: '<div style="' +
-                    'width:10px;height:10px;border-radius:50%;' +
-                    'background:' + color + ';' +
-                    'border:2px solid rgba(255,255,255,0.8);' +
-                    'box-shadow:0 1px 4px rgba(0,0,0,0.3);' +
-                    '"></div>',
-                iconSize: [10, 10],
-                iconAnchor: [5, 5]
+                    'color:' + color + ';font-size:14px;' +
+                    'text-shadow:0 1px 3px rgba(0,0,0,0.4),0 0 2px rgba(255,255,255,0.8);' +
+                    'cursor:pointer;' +
+                    '"><i class="fa-solid fa-house-flood-water"></i></div>',
+                iconSize: [16, 16],
+                iconAnchor: [8, 8]
             });
 
             var m = L.marker([office.lat, office.lng], { icon: icon }).addTo(branchMarkerLayer);
+
+            // Default popup (click)
             m.bindPopup(
                 '<div style="font-family:\'IBM Plex Sans Thai\',sans-serif;min-width:140px;">' +
                 '<div style="font-weight:600;font-size:13px;">' + office.name + '</div>' +
-                '<div style="color:#666;font-size:11px;">Code: ' + office.pwa_code + '</div>' +
-                '<div style="color:#888;font-size:11px;">Zone: ' + office.zone + '</div>' +
+                '<div style="color:#666;font-size:11px;">รหัส: ' + office.pwa_code + '</div>' +
+                '<div style="color:#888;font-size:11px;">เขต: ' + office.zone + '</div>' +
                 '</div>'
             );
+
+            // Default hover tooltip (enriched after dashboard data loads)
+            m.bindTooltip(office.pwa_code + ' ' + office.name, {
+                direction: 'top', offset: [0, -10], className: 'branch-tooltip'
+            });
+
+            branchMarkerMap[office.pwa_code] = { marker: m, office: office };
         });
 
     } catch (e) {
         console.error('Load branch markers error:', e);
     }
+}
+
+/**
+ * Enrich branch marker tooltips with meter count and pipe length.
+ * Called after dashboard data loads.
+ */
+function updateBranchTooltips() {
+    if (!allBranches || !allBranches.length) return;
+
+    allBranches.forEach(function(b) {
+        var entry = branchMarkerMap[b.pwa_code];
+        if (!entry) return;
+
+        var meterCount = (b.layers || {}).meter || 0;
+        var pipeLong = b.pipe_long || 0;
+        var office = entry.office;
+        var zoneIdx = parseInt(office.zone) - 1;
+        var color = ZONE_COLORS[zoneIdx >= 0 ? zoneIdx : 0] || '#999';
+
+        // Rebind hover tooltip with data
+        entry.marker.unbindTooltip();
+        entry.marker.bindTooltip(
+            '<div style="font-family:\'IBM Plex Sans Thai\',sans-serif;min-width:180px;line-height:1.5;">' +
+            '<div style="font-weight:700;font-size:13px;color:' + color + ';">' +
+            '<i class="fa-solid fa-house-flood-water" style="margin-right:4px;"></i>' + office.name + '</div>' +
+            '<div style="color:#555;font-size:11px;margin-bottom:4px;">รหัส ' + b.pwa_code + ' | เขต ' + b.zone + '</div>' +
+            '<hr style="margin:0 0 4px 0;border:0;border-top:1px solid #e0e0e0;">' +
+            '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px;">' +
+            '<span style="color:#666;">มาตรวัดน้ำ</span>' +
+            '<span style="font-weight:700;color:#3498DB;">' + formatNumber(meterCount) + '</span></div>' +
+            '<div style="display:flex;justify-content:space-between;font-size:12px;">' +
+            '<span style="color:#666;">ความยาวท่อ(ม.)</span>' +
+            '<span style="font-weight:700;color:#E67E22;">' + formatDecimal(pipeLong) + '</span></div>' +
+            '</div>',
+            { direction: 'top', offset: [0, -10], className: 'branch-tooltip', sticky: false }
+        );
+
+        // Also enrich click popup
+        entry.marker.unbindPopup();
+        entry.marker.bindPopup(
+            '<div style="font-family:\'IBM Plex Sans Thai\',sans-serif;min-width:190px;line-height:1.6;">' +
+            '<div style="font-weight:700;font-size:14px;color:' + color + ';">' +
+            '<i class="fa-solid fa-house-flood-water" style="margin-right:4px;"></i>' + office.name + '</div>' +
+            '<div style="color:#666;font-size:11px;margin-bottom:6px;">รหัส ' + b.pwa_code + ' | เขต ' + b.zone + '</div>' +
+            '<div style="background:#f8f9fa;border-radius:6px;padding:6px 8px;font-size:12px;">' +
+            '<div style="display:flex;justify-content:space-between;margin-bottom:3px;">' +
+            '<span>💧 มาตรวัดน้ำ</span><strong style="color:#3498DB;">' + formatNumber(meterCount) + '</strong></div>' +
+            '<div style="display:flex;justify-content:space-between;">' +
+            '<span>📏 ความยาวท่อ</span><strong style="color:#E67E22;">' + formatDecimal(pipeLong) + ' ม.</strong></div>' +
+            '</div></div>'
+        );
+    });
 }
 
 /** Update zone popup content with feature counts after dashboard data loads. */
@@ -276,6 +347,7 @@ async function loadDashboard() {
             renderBranchList(allBranches);
             renderFullTable(allBranches);
             updateMapPopups(data);
+            updateBranchTooltips();
         }
     } catch (e) {
         console.error('Dashboard load error:', e);
@@ -461,53 +533,114 @@ function renderBranchList(branches) {
     }).join('');
 }
 
-/** Render the full data table with all layers as columns. */
+/**
+ * Render the full data table.
+ * - "ความยาวท่อ(ม.)" column inserted right after "ท่อประปา" (pipe)
+ * - Pagination: 20 rows per page
+ */
 function renderFullTable(branches) {
     var thead = document.getElementById('fullTableHeader');
-    var tbody = document.getElementById('fullTableBody');
     var tfoot = document.getElementById('fullTableFooter');
     var layers = layerNames.map(function(l) { return l.name; });
+    var pipeIdx = layers.indexOf('pipe');
 
-    // Build header
-    var hh = '<th>#</th><th>Code</th><th>Branch</th><th>Zone</th>';
-    layerNames.forEach(function(l) { hh += '<th class="text-right">' + l.display_name + '</th>'; });
-    hh += '<th class="text-right">Total</th>';
+    // Header: #, รหัสสาขา, ชื่อสาขา, เขต, [layers + ความยาวท่อ after pipe], ผลรวม
+    var hh = '<th>#</th><th>รหัสสาขา</th><th>ชื่อสาขา</th><th>เขต</th>';
+    layerNames.forEach(function(l, idx) {
+        hh += '<th class="text-right">' + l.display_name + '</th>';
+        if (idx === pipeIdx) {
+            hh += '<th class="text-right" style="color:#E67E22;">ความยาวท่อ(ม.)</th>';
+        }
+    });
+    hh += '<th class="text-right">ผลรวม</th>';
     thead.innerHTML = hh;
 
     // Sort by zone (numeric) then pwa_code
-    var sorted = branches.slice().sort(function(a, b) {
+    fullTableSorted = branches.slice().sort(function(a, b) {
         var za = parseInt(a.zone) || 0, zb = parseInt(b.zone) || 0;
         if (za !== zb) return za - zb;
         return a.pwa_code.localeCompare(b.pwa_code);
     });
 
-    // Build body rows
-    tbody.innerHTML = sorted.map(function(b, i) {
+    // Reset to page 1 and render
+    fullTablePage = 1;
+    renderTablePage();
+
+    // Footer totals (always for full dataset)
+    var totals = {};
+    var grandTotal = 0;
+    var totalPipeLong = 0;
+    layers.forEach(function(l) { totals[l] = 0; });
+    fullTableSorted.forEach(function(b) {
+        layers.forEach(function(l) { totals[l] += (b.layers || {})[l] || 0; });
+        grandTotal += b.total;
+        totalPipeLong += b.pipe_long || 0;
+    });
+
+    var fh = '<tr class="total-row"><td colspan="4"><strong>รวมทั้งหมด (' + fullTableSorted.length + ' สาขา)</strong></td>';
+    layers.forEach(function(l, idx) {
+        fh += '<td class="num">' + formatNumber(totals[l]) + '</td>';
+        if (idx === pipeIdx) {
+            fh += '<td class="num" style="color:#E67E22;font-weight:600;">' + formatDecimal(totalPipeLong) + '</td>';
+        }
+    });
+    fh += '<td class="num" style="color:var(--pwa-gold);font-weight:700">' + formatNumber(grandTotal) + '</td></tr>';
+    tfoot.innerHTML = fh;
+}
+
+/** Render current page of the table body + pagination controls. */
+function renderTablePage() {
+    var tbody = document.getElementById('fullTableBody');
+    var layers = layerNames.map(function(l) { return l.name; });
+    var pipeIdx = layers.indexOf('pipe');
+
+    var total = fullTableSorted.length;
+    var maxPage = Math.max(1, Math.ceil(total / ROWS_PER_PAGE));
+    if (fullTablePage > maxPage) fullTablePage = maxPage;
+
+    var start = (fullTablePage - 1) * ROWS_PER_PAGE;
+    var end = Math.min(total, start + ROWS_PER_PAGE);
+    var pageData = fullTableSorted.slice(start, end);
+
+    tbody.innerHTML = pageData.map(function(b, pi) {
+        var i = start + pi;
         var r = '<td class="text-xs" style="color:var(--text-muted)">' + (i + 1) + '</td>' +
             '<td><span class="badge badge-blue">' + b.pwa_code + '</span></td>' +
             '<td class="text-sm">' + b.branch_name + '</td>' +
             '<td><span class="badge badge-gold">' + b.zone + '</span></td>';
-        layers.forEach(function(l) {
+        layers.forEach(function(l, idx) {
             var val = (b.layers || {})[l] || 0;
             r += '<td class="num ' + (val === 0 ? 'zero' : '') + '">' + formatNumber(val) + '</td>';
+            if (idx === pipeIdx) {
+                var pl = b.pipe_long || 0;
+                r += '<td class="num ' + (pl === 0 ? 'zero' : '') + '" style="color:#E67E22;">' + formatDecimal(pl) + '</td>';
+            }
         });
         r += '<td class="num" style="font-weight:600;color:var(--pwa-gold)">' + formatNumber(b.total) + '</td>';
         return '<tr>' + r + '</tr>';
     }).join('');
 
-    // Build footer totals
-    var totals = {};
-    var grandTotal = 0;
-    layers.forEach(function(l) { totals[l] = 0; });
-    sorted.forEach(function(b) {
-        layers.forEach(function(l) { totals[l] += (b.layers || {})[l] || 0; });
-        grandTotal += b.total;
-    });
+    // Render pagination controls
+    var pag = document.getElementById('fullTablePagination');
+    if (!pag) return;
 
-    var fh = '<tr class="total-row"><td colspan="4"><strong>Grand Total</strong></td>';
-    layers.forEach(function(l) { fh += '<td class="num">' + formatNumber(totals[l]) + '</td>'; });
-    fh += '<td class="num" style="color:var(--pwa-gold);font-weight:700">' + formatNumber(grandTotal) + '</td></tr>';
-    tfoot.innerHTML = fh;
+    var from = total === 0 ? 0 : start + 1;
+    pag.innerHTML =
+        '<div class="text-xs" style="color:var(--text-muted);">แสดง ' + from + ' – ' + end + ' จาก ' + total + ' สาขา</div>' +
+        '<div style="display:flex;align-items:center;gap:8px;">' +
+        '<button class="btn btn-outline" style="padding:4px 12px;font-size:12px;" id="pgPrev" ' +
+            (fullTablePage <= 1 ? 'disabled' : '') + '>◀ ก่อนหน้า</button>' +
+        '<span class="text-xs" style="color:var(--text-secondary);">หน้า ' + fullTablePage + ' / ' + maxPage + '</span>' +
+        '<button class="btn btn-outline" style="padding:4px 12px;font-size:12px;" id="pgNext" ' +
+            (fullTablePage >= maxPage ? 'disabled' : '') + '>ถัดไป ▶</button>' +
+        '</div>';
+
+    document.getElementById('pgPrev').onclick = function() {
+        if (fullTablePage > 1) { fullTablePage--; renderTablePage(); }
+    };
+    document.getElementById('pgNext').onclick = function() {
+        if (fullTablePage < maxPage) { fullTablePage++; renderTablePage(); }
+    };
 }
 
 // ==========================================
@@ -578,6 +711,12 @@ function exportExcel() {
 function formatNumber(n) {
     if (n === null || n === undefined) return '0';
     return Number(n).toLocaleString('th-TH');
+}
+
+/** Format decimal number with 2 decimal places. */
+function formatDecimal(n) {
+    if (n === null || n === undefined || n === 0) return '0.00';
+    return Number(n).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 /** Show loading overlay with message. */

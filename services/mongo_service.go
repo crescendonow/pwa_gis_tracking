@@ -166,6 +166,64 @@ func CountAllLayersForBranch(pwaCode string, startDate, endDate string) (map[str
 	return result, nil
 }
 
+// SumPipeLength sums the "length" field from the pipe collection for a branch.
+// Returns the total pipe length in meters. Uses MongoDB $sum aggregation.
+func SumPipeLength(pwaCode string, startDate, endDate string) (float64, error) {
+	collectionID, err := FindCollectionID(pwaCode, "pipe")
+	if err != nil {
+		return 0, nil // No pipe collection = 0 length
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	featuresCol := config.GetMongoCollection(fmt.Sprintf("features_%s", collectionID))
+
+	// Build match stage with optional date filter
+	matchStage := bson.M{}
+	if startDate != "" || endDate != "" {
+		dateField := "properties.recordDate"
+		dateFilter := buildDateFilter(dateField, startDate, endDate)
+		if dateFilter != nil {
+			matchStage = dateFilter
+		}
+	}
+
+	// Aggregation pipeline: match → group → sum length
+	pipeline := []bson.M{
+		{"$match": matchStage},
+		{"$group": bson.M{
+			"_id": nil,
+			"total_length": bson.M{
+				"$sum": bson.M{
+					"$toDouble": bson.M{
+						"$ifNull": []interface{}{"$properties.length", 0},
+					},
+				},
+			},
+		}},
+	}
+
+	cursor, err := featuresCol.Aggregate(ctx, pipeline)
+	if err != nil {
+		log.Printf("SumPipeLength aggregate failed for %s: %v", pwaCode, err)
+		return 0, nil
+	}
+	defer cursor.Close(ctx)
+
+	var result struct {
+		TotalLength float64 `bson:"total_length"`
+	}
+	if cursor.Next(ctx) {
+		if err := cursor.Decode(&result); err != nil {
+			log.Printf("SumPipeLength decode failed for %s: %v", pwaCode, err)
+			return 0, nil
+		}
+	}
+
+	return result.TotalLength, nil
+}
+
 // GetBranchCountsSummary returns feature counts for all branches (concurrent).
 func GetBranchCountsSummary(offices []models.PwaOffice, startDate, endDate string) ([]models.FeatureCountByBranch, error) {
 	var results []models.FeatureCountByBranch
