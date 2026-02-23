@@ -1,7 +1,7 @@
 /**
  * PWA GIS Online Tracking - Dashboard Page
  * - Uses ThaiDatePicker (thai_custom_date.js) for Buddhist Era calendar
- * - Loads branch markers from /api/offices/geom (wkb_geometry)
+ * - Loads branch markers from /pwa_gis_tracking/api/offices/geom (wkb_geometry)
  * - Numeric zone sorting (1,2,3,...10)
  */
 
@@ -80,7 +80,7 @@ async function apiGet(url) {
 /** Load zone options into the filter dropdown (sorted numerically by backend). */
 async function loadZones() {
     try {
-        var data = await apiGet('/api/zones');
+        var data = await apiGet('/pwa_gis_tracking/api/zones');
         var select = document.getElementById('filterZone');
         if (data.data) {
             data.data.forEach(function(z) {
@@ -96,7 +96,7 @@ async function loadZones() {
 /** Load year options (displayed as both AD and BE). */
 async function loadYears() {
     try {
-        var data = await apiGet('/api/years');
+        var data = await apiGet('/pwa_gis_tracking/api/years');
         var select = document.getElementById('filterYear');
         if (data.data) {
             data.data.reverse().forEach(function(y) {
@@ -112,7 +112,7 @@ async function loadYears() {
 /** Load GIS layer names for chart labels. */
 async function loadLayers() {
     try {
-        var data = await apiGet('/api/layers');
+        var data = await apiGet('/pwa_gis_tracking/api/layers');
         if (data.data) { layerNames = data.data; }
     } catch (e) { console.error('Load layers error:', e); }
 }
@@ -195,13 +195,13 @@ function initZoneMap() {
  * Each branch is shown as a small colored dot on the map.
  */
 /**
- * Load branch markers from /api/offices/geom.
+ * Load branch markers from /pwa_gis_tracking/api/offices/geom.
  * Uses FontAwesome house-flood-water icon colored by zone.
  * Stores markers for hover tooltip enrichment after dashboard loads.
  */
 async function loadBranchMarkers() {
     try {
-        var data = await apiGet('/api/offices/geom');
+        var data = await apiGet('/pwa_gis_tracking/api/offices/geom');
         if (!data.data || !zoneMap) return;
 
         branchMarkerLayer = L.layerGroup().addTo(zoneMap);
@@ -330,7 +330,7 @@ async function loadDashboard() {
         var startDate = document.getElementById('filterStartDate').value;
         var endDate = document.getElementById('filterEndDate').value;
 
-        var url = '/api/dashboard?';
+        var url = '/pwa_gis_tracking/api/dashboard?';
         if (zone) url += 'zone=' + zone + '&';
         if (startDate) url += 'startDate=' + startDate + '&';
         if (endDate) url += 'endDate=' + endDate + '&';
@@ -694,7 +694,7 @@ function exportExcel() {
     var startDate = document.getElementById('filterStartDate').value;
     var endDate = document.getElementById('filterEndDate').value;
 
-    var url = '/api/export/excel?';
+    var url = '/pwa_gis_tracking/api/export/excel?';
     if (zone) url += 'zone=' + zone + '&';
     if (startDate) url += 'startDate=' + startDate + '&';
     if (endDate) url += 'endDate=' + endDate + '&';

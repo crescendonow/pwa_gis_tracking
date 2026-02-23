@@ -41,7 +41,7 @@ async function apiGet(url) {
 /** Load zone options into the detail page dropdown. */
 async function loadDetailZones() {
     try {
-        var data = await apiGet('/api/zones');
+        var data = await apiGet('/pwa_gis_tracking/api/zones');
         var select = document.getElementById('detailZone');
         if (data.data) {
             data.data.forEach(function(z) {
@@ -57,7 +57,7 @@ async function loadDetailZones() {
 /** Load layer options into both the filter and export dropdowns. */
 async function loadDetailLayers() {
     try {
-        var data = await apiGet('/api/layers');
+        var data = await apiGet('/pwa_gis_tracking/api/layers');
         if (data.data) {
             allLayers = data.data;
             var select = document.getElementById('detailLayer');
@@ -81,7 +81,7 @@ async function onDetailZoneChange() {
     if (!zone) return;
 
     try {
-        var data = await apiGet('/api/offices?zone=' + zone);
+        var data = await apiGet('/pwa_gis_tracking/api/offices?zone=' + zone);
         if (data.data) {
             data.data.forEach(function(o) {
                 var opt = document.createElement('option');
@@ -111,7 +111,7 @@ async function loadBranchDetail() {
     showLoading('Counting features...');
 
     try {
-        var url = '/api/counts?pwaCode=' + pwaCode;
+        var url = '/pwa_gis_tracking/api/counts?pwaCode=' + pwaCode;
         if (startDate) url += '&startDate=' + startDate;
         if (endDate) url += '&endDate=' + endDate;
 
@@ -268,7 +268,7 @@ function exportDetailExcel() {
         return;
     }
 
-    var url = '/api/export/excel?';
+    var url = '/pwa_gis_tracking/api/export/excel?';
     if (zone) url += 'zone=' + zone + '&';
     if (startDate) url += 'startDate=' + startDate + '&';
     if (endDate) url += 'endDate=' + endDate + '&';
@@ -294,7 +294,7 @@ function exportGeoData() {
         return;
     }
 
-    var url = '/api/export/geodata?pwaCode=' + pwaCode +
+    var url = '/pwa_gis_tracking/api/export/geodata?pwaCode=' + pwaCode +
         '&collection=' + layer +
         '&format=' + format;
     if (startDate) url += '&startDate=' + startDate;

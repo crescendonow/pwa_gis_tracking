@@ -8,41 +8,45 @@ import (
 
 // RegisterRoutes sets up all HTTP routes for the application.
 func RegisterRoutes(router *gin.Engine) {
-	// Serve static files (CSS, JS)
-	router.Static("/static", "./static")
-
-	// Load HTML templates
+	// 1. Load HTML templates (คำสั่งนี้ต้องอยู่กับ router ตัวหลัก)
 	router.LoadHTMLGlob("templates/*")
 
-	// HTML pages
-	router.GET("/", func(c *gin.Context) {
-		c.HTML(200, "dashboard.html", nil)
-	})
-	router.GET("/detail", func(c *gin.Context) {
-		c.HTML(200, "detail.html", nil)
-	})
-
-	// REST API endpoints
-	api := router.Group("/api")
+	// 2. สร้าง Group ครอบ Path ที่ต้องการ
+	base := router.Group("/pwa_gis_tracking")
 	{
-		api.GET("/zones", handlers.GetZones)                // List zones with branch counts
-		api.GET("/offices", handlers.GetOffices)            // List offices (optional zone filter)
-		api.GET("/offices/geom", handlers.GetOfficesWithGeom) // Offices with lat/lng from WKB geometry
-		api.GET("/years", handlers.GetYears)                // Available years for date filter
-		api.GET("/layers", handlers.GetLayers)              // Supported GIS layers
-		api.GET("/counts", handlers.GetBranchCounts)        // Feature counts for a single branch
-		api.GET("/dashboard", handlers.GetDashboardSummary) // Full dashboard summary
-		api.GET("/export/excel", handlers.ExportExcel)      // Download Excel summary
-		api.GET("/export/geodata", handlers.ExportGeoData)  // Download GeoJSON/GPKG
-		api.GET("/debug/collection", handlers.DebugCollection) // Debug MongoDB collection lookup
-	}
+		// Serve static files (CSS, JS) ภายใต้ group
+		base.Static("/static", "./static")
 
-	// Health check endpoint
-	router.GET("/health", func(c *gin.Context) {
-		c.JSON(200, gin.H{
-			"status":  "OK",
-			"service": "PWA GIS Online Tracking",
-			"port":    5011,
+		// HTML pages
+		base.GET("/", func(c *gin.Context) {
+			c.HTML(200, "dashboard.html", nil)
 		})
-	})
+		base.GET("/detail", func(c *gin.Context) {
+			c.HTML(200, "detail.html", nil)
+		})
+
+		// REST API endpoints ภายใต้ group
+		api := base.Group("/api")
+		{
+			api.GET("/zones", handlers.GetZones)
+			api.GET("/offices", handlers.GetOffices)
+			api.GET("/offices/geom", handlers.GetOfficesWithGeom)
+			api.GET("/years", handlers.GetYears)
+			api.GET("/layers", handlers.GetLayers)
+			api.GET("/counts", handlers.GetBranchCounts)
+			api.GET("/dashboard", handlers.GetDashboardSummary)
+			api.GET("/export/excel", handlers.ExportExcel)
+			api.GET("/export/geodata", handlers.ExportGeoData)
+			api.GET("/debug/collection", handlers.DebugCollection)
+		}
+
+		// Health check endpoint
+		base.GET("/health", func(c *gin.Context) {
+			c.JSON(200, gin.H{
+				"status":  "OK",
+				"service": "PWA GIS Online Tracking",
+				"port":    5011,
+			})
+		})
+	}
 }
