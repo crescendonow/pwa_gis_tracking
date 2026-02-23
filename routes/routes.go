@@ -1,6 +1,7 @@
 package routes
 
 import (
+
 	"pwa_gis_tracking/handlers"
 
 	"github.com/gin-gonic/gin"
@@ -8,13 +9,27 @@ import (
 
 // RegisterRoutes sets up all HTTP routes for the application.
 func RegisterRoutes(router *gin.Engine) {
-	// 1. Load HTML templates (คำสั่งนี้ต้องอยู่กับ router ตัวหลัก)
+
+	// 1. Load HTML templates
 	router.LoadHTMLGlob("templates/*")
 
-	// 2. สร้าง Group ครอบ Path ที่ต้องการ
-	base := router.Group("/pwa_gis_tracking")
+	basePath := "/pwa_gis_tracking"
+
+	// ─── Public routes (no auth required) ─────────────────
+	pub := router.Group(basePath)
 	{
-		// Serve static files (CSS, JS) ภายใต้ group
+		// Login page (GET) and login action (POST)
+		pub.GET("/login", handlers.ShowLoginPage)
+		pub.POST("/login", handlers.HandleLogin)
+
+		// Logout
+		pub.GET("/logout", handlers.HandleLogout)
+	}
+
+	// ─── Protected routes (session auth required) ─────────
+	base := router.Group(basePath, handlers.AuthRequired(basePath))
+	{
+		// Serve static files (CSS, JS)
 		base.Static("/static", "./static")
 
 		// HTML pages
@@ -25,7 +40,7 @@ func RegisterRoutes(router *gin.Engine) {
 			c.HTML(200, "detail.html", nil)
 		})
 
-		// REST API endpoints ภายใต้ group
+		// REST API endpoints
 		api := base.Group("/api")
 		{
 			api.GET("/zones", handlers.GetZones)
@@ -40,12 +55,11 @@ func RegisterRoutes(router *gin.Engine) {
 			api.GET("/debug/collection", handlers.DebugCollection)
 		}
 
-		// Health check endpoint
+		// Health check
 		base.GET("/health", func(c *gin.Context) {
 			c.JSON(200, gin.H{
 				"status":  "OK",
 				"service": "PWA GIS Online Tracking",
-				"port":    5011,
 			})
 		})
 	}

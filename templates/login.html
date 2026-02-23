@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>เข้าสู่ระบบ — PWA GIS Online Tracking</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🗺️</text></svg>">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <style>
+        :root {
+            --bg-primary:    #0A0F1A;
+            --bg-secondary:  #111827;
+            --bg-card:       #1A2332;
+            --border:        rgba(255,255,255,0.06);
+            --text-primary:  #F1F5F9;
+            --text-secondary:#94A3B8;
+            --text-muted:    #64748B;
+            --pwa-blue:      #1B4F72;
+            --pwa-blue-light:#2E86C1;
+            --pwa-gold:      #D4A843;
+            --accent-green:  #10B981;
+            --accent-red:    #EF4444;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'IBM Plex Sans Thai', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* ===== Animated Background ===== */
+        .bg-layer { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+        .bg-gradient {
+            background:
+                radial-gradient(ellipse 80% 50% at 20% 80%, rgba(27,79,114,0.25) 0%, transparent 70%),
+                radial-gradient(ellipse 60% 40% at 80% 20%, rgba(46,134,193,0.12) 0%, transparent 70%),
+                radial-gradient(ellipse 40% 30% at 50% 50%, rgba(212,168,67,0.06) 0%, transparent 70%);
+        }
+        .bg-grid {
+            background-image:
+                linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
+            background-size: 60px 60px;
+            animation: gridDrift 30s linear infinite;
+        }
+        @keyframes gridDrift { 0% { background-position:0 0; } 100% { background-position:60px 60px; } }
+
+        /* Water ripples */
+        .ripple {
+            position: absolute; border-radius: 50%;
+            border: 1px solid rgba(46,134,193,0.08);
+            animation: rippleExpand 8s ease-out infinite;
+        }
+        .ripple:nth-child(1) { width:300px; height:300px; left:10%; top:60%; animation-delay:0s; }
+        .ripple:nth-child(2) { width:500px; height:500px; right:-5%; top:20%; animation-delay:2s; }
+        .ripple:nth-child(3) { width:200px; height:200px; left:55%; top:80%; animation-delay:4s; }
+        @keyframes rippleExpand {
+            0%   { transform:scale(0.8); opacity:0.6; }
+            100% { transform:scale(1.8); opacity:0; }
+        }
+
+        /* ===== Layout ===== */
+        .login-wrapper {
+            position: relative; z-index: 1;
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+        .login-container {
+            width: 100%; max-width: 420px;
+            animation: fadeSlideUp 0.6s ease-out;
+        }
+        @keyframes fadeSlideUp {
+            0%   { opacity:0; transform:translateY(24px); }
+            100% { opacity:1; transform:translateY(0); }
+        }
+
+        /* ===== Logo ===== */
+        .login-header { text-align: center; margin-bottom: 32px; }
+        .logo-badge {
+            display: inline-flex;
+            align-items: center; justify-content: center;
+            width: 72px; height: 72px;
+            background: linear-gradient(135deg, var(--pwa-blue), var(--pwa-blue-light));
+            border-radius: 18px;
+            font-size: 28px; font-weight: 700; color: #fff;
+            letter-spacing: 1px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 32px rgba(27,79,114,0.4), 0 0 0 1px rgba(255,255,255,0.05);
+            position: relative; overflow: hidden;
+        }
+        .logo-badge::after {
+            content: '';
+            position: absolute; inset: 0;
+            background: linear-gradient(135deg, transparent 40%, rgba(255,255,255,0.1) 50%, transparent 60%);
+            animation: shimmer 3s ease-in-out infinite;
+        }
+        @keyframes shimmer { 0%,100% { transform:translateX(-100%); } 50% { transform:translateX(100%); } }
+
+        .login-header h1 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+        .login-header p   { font-size: 13px; color: var(--text-muted); }
+
+        /* ===== Card ===== */
+        .login-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 32px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3), 0 0 0 1px rgba(255,255,255,0.03) inset;
+            position: relative; overflow: hidden;
+        }
+        .login-card::before {
+            content: '';
+            position: absolute; top: 0; left: 0; right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--pwa-blue), var(--pwa-gold), var(--pwa-blue-light));
+        }
+        .card-title {
+            font-size: 16px; font-weight: 600;
+            margin-bottom: 24px;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .card-title i { color: var(--pwa-gold); font-size: 14px; }
+
+        /* ===== Form ===== */
+        .field { margin-bottom: 20px; }
+        .field label {
+            display: block; font-size: 12px; font-weight: 500;
+            color: var(--text-secondary); margin-bottom: 6px;
+        }
+        .input-wrap { position: relative; }
+        .input-wrap .icon-left {
+            position: absolute; left: 14px; top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted); font-size: 14px;
+            transition: color 0.2s; pointer-events: none;
+        }
+        .input-wrap input {
+            width: 100%;
+            padding: 12px 14px 12px 42px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            color: var(--text-primary);
+            font-size: 14px; font-family: inherit;
+            outline: none; transition: all 0.2s;
+        }
+        .input-wrap input::placeholder { color: var(--text-muted); }
+        .input-wrap input:focus {
+            border-color: var(--pwa-blue-light);
+            box-shadow: 0 0 0 3px rgba(46,134,193,0.15);
+        }
+        .input-wrap input:focus ~ .icon-left { color: var(--pwa-blue-light); }
+
+        .toggle-pass {
+            position: absolute; right: 12px; top: 50%;
+            transform: translateY(-50%);
+            background: none; border: none;
+            color: var(--text-muted); cursor: pointer;
+            font-size: 14px; padding: 4px;
+            transition: color 0.2s;
+        }
+        .toggle-pass:hover { color: var(--text-secondary); }
+
+        /* ===== Error ===== */
+        .error-msg {
+            display: none;
+            align-items: center; gap: 8px;
+            padding: 10px 14px;
+            background: rgba(239,68,68,0.1);
+            border: 1px solid rgba(239,68,68,0.2);
+            border-radius: 10px;
+            font-size: 13px; color: #FCA5A5;
+            margin-bottom: 20px;
+            animation: shakeX 0.4s ease-out;
+        }
+        .error-msg.show { display: flex; }
+        @keyframes shakeX {
+            0%,100% { transform:translateX(0); }
+            20% { transform:translateX(-8px); }
+            40% { transform:translateX(6px); }
+            60% { transform:translateX(-4px); }
+            80% { transform:translateX(2px); }
+        }
+
+        /* ===== Button ===== */
+        .btn-login {
+            width: 100%; padding: 13px 20px;
+            background: linear-gradient(135deg, var(--pwa-blue), var(--pwa-blue-light));
+            border: none; border-radius: 10px;
+            color: #fff; font-size: 15px; font-weight: 600;
+            font-family: inherit; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            transition: all 0.2s;
+            position: relative; overflow: hidden;
+        }
+        .btn-login:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 8px 24px rgba(27,79,114,0.4);
+        }
+        .btn-login:active { transform: translateY(0); }
+        .btn-login:disabled { opacity: 0.7; cursor: wait; }
+        .btn-login .spinner-sm {
+            display: none;
+            width: 18px; height: 18px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+        }
+        .btn-login.loading .btn-text { display: none; }
+        .btn-login.loading .spinner-sm { display: block; }
+        @keyframes spin { to { transform:rotate(360deg); } }
+
+        /* ===== Footer ===== */
+        .login-footer { text-align: center; margin-top: 24px; }
+        .login-footer p { font-size: 11px; color: var(--text-muted); line-height: 1.6; }
+        .login-footer .pwa-name { color: var(--pwa-gold); font-weight: 500; }
+
+        .page-footer {
+            position: relative; z-index: 1;
+            text-align: center; padding: 16px 24px;
+        }
+        .page-footer p { font-size: 11px; color: var(--text-muted); }
+
+        @media (max-width: 480px) {
+            .login-card { padding: 24px 20px; }
+            .logo-badge { width: 60px; height: 60px; font-size: 24px; }
+            .login-header h1 { font-size: 19px; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Background -->
+    <div class="bg-layer bg-gradient"></div>
+    <div class="bg-layer bg-grid"></div>
+    <div class="bg-layer">
+        <div class="ripple"></div>
+        <div class="ripple"></div>
+        <div class="ripple"></div>
+    </div>
+
+    <!-- Login -->
+    <div class="login-wrapper">
+        <div class="login-container">
+
+            <div class="login-header">
+                <div class="logo-badge">GIS</div>
+                <h1>PWA GIS Online Tracking</h1>
+                <p>ระบบติดตามข้อมูล GIS ออนไลน์ — การประปาส่วนภูมิภาค</p>
+            </div>
+
+            <div class="login-card">
+                <div class="card-title">
+                    <i class="fa-solid fa-right-to-bracket"></i>
+                    เข้าสู่ระบบ
+                </div>
+
+                <div class="error-msg" id="errorMsg">
+                    <i class="fa-solid fa-circle-exclamation"></i>
+                    <span id="errorText">ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง</span>
+                </div>
+
+                <form id="loginForm" autocomplete="off">
+                    <div class="field">
+                        <label for="username">ชื่อผู้ใช้</label>
+                        <div class="input-wrap">
+                            <input type="text" id="username" name="username"
+                                   placeholder="กรอกชื่อผู้ใช้" required autofocus>
+                            <i class="fa-solid fa-user icon-left"></i>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label for="password">รหัสผ่าน</label>
+                        <div class="input-wrap">
+                            <input type="password" id="password" name="password"
+                                   placeholder="กรอกรหัสผ่าน" required>
+                            <i class="fa-solid fa-lock icon-left"></i>
+                            <button type="button" class="toggle-pass" onclick="togglePassword()">
+                                <i class="fa-solid fa-eye" id="eyeIcon"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn-login" id="btnLogin">
+                        <span class="btn-text">
+                            <i class="fa-solid fa-arrow-right-to-bracket"></i>
+                            เข้าสู่ระบบ
+                        </span>
+                        <div class="spinner-sm"></div>
+                    </button>
+                </form>
+            </div>
+
+            <div class="login-footer">
+                <p>
+                    <i class="fa-solid fa-shield-halved" style="color:var(--accent-green);margin-right:4px;"></i>
+                    ระบบนี้สำหรับเจ้าหน้าที่ <span class="pwa-name">การประปาส่วนภูมิภาค</span> เท่านั้น
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <footer class="page-footer">
+        <p>PWA GIS Online Tracking © 2025 — Provincial Waterworks Authority</p>
+    </footer>
+
+    <script>
+        var BASE = '{{.BasePath}}';
+
+        function togglePassword() {
+            var inp = document.getElementById('password');
+            var ico = document.getElementById('eyeIcon');
+            if (inp.type === 'password') {
+                inp.type = 'text';
+                ico.classList.replace('fa-eye', 'fa-eye-slash');
+            } else {
+                inp.type = 'password';
+                ico.classList.replace('fa-eye-slash', 'fa-eye');
+            }
+        }
+
+        document.getElementById('loginForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            var btn = document.getElementById('btnLogin');
+            var errBox = document.getElementById('errorMsg');
+            var errText = document.getElementById('errorText');
+
+            errBox.classList.remove('show');
+            btn.classList.add('loading');
+            btn.disabled = true;
+
+            try {
+                var resp = await fetch(BASE + '/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        username: document.getElementById('username').value.trim(),
+                        password: document.getElementById('password').value
+                    })
+                });
+                var data = await resp.json();
+
+                if (resp.ok && data.status === 'success') {
+                    window.location.href = data.redirect || (BASE + '/');
+                } else {
+                    errText.textContent = data.message || 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง';
+                    errBox.classList.add('show');
+                }
+            } catch (err) {
+                errText.textContent = 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้';
+                errBox.classList.add('show');
+            } finally {
+                btn.classList.remove('loading');
+                btn.disabled = false;
+            }
+        });
+
+        // Show error on redirect back
+        (function() {
+            if (new URLSearchParams(window.location.search).get('error') === '1') {
+                document.getElementById('errorMsg').classList.add('show');
+            }
+        })();
+    </script>
+</body>
+</html>
