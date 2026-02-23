@@ -86,7 +86,7 @@ async function loadZones() {
             data.data.forEach(function(z) {
                 var opt = document.createElement('option');
                 opt.value = z.zone;
-                opt.textContent = 'Zone ' + z.zone + ' (' + z.branch_count + ' branches)';
+                opt.textContent = 'เขต ' + z.zone + ' (' + z.branch_count + ' สาขา)';
                 select.appendChild(opt);
             });
         }
@@ -163,7 +163,7 @@ function initZoneMap() {
         var marker = L.marker([z.lat, z.lng], { icon: icon, zIndexOffset: 1000 }).addTo(zoneMap);
         marker.bindPopup(
             '<div style="text-align:center;min-width:160px;font-family:\'IBM Plex Sans Thai\',sans-serif;">' +
-            '<div style="font-size:15px;font-weight:700;margin-bottom:4px;">Zone ' + zoneId + '</div>' +
+            '<div style="font-size:15px;font-weight:700;margin-bottom:4px;">เขต ' + zoneId + '</div>' +
             '<div style="color:#555;font-size:12px;">' + z.region + '</div>' +
             '<div style="color:#888;font-size:11px;margin-bottom:6px;">' + z.name + '</div>' +
             '<div id="mapPop' + zoneId + '" style="font-size:13px;font-weight:700;color:' + color + ';">—</div>' +
@@ -178,7 +178,7 @@ function initZoneMap() {
                 if (item.getAttribute('data-zone') === zoneId) item.classList.add('active');
             });
             var filtered = allBranches.filter(function(b) { return b.zone === zoneId; });
-            document.getElementById('detailTitle').textContent = 'Branches in Zone ' + zoneId;
+            document.getElementById('detailTitle').textContent = 'สาขาในเขต ' + zoneId;
             renderBranchList(filtered);
             renderFullTable(filtered);
         });
@@ -305,15 +305,63 @@ function updateBranchTooltips() {
 function updateMapPopups(data) {
     if (!zoneMap) return;
     var zt = data.zone_totals || {};
+    var branches = data.branches || [];
+
+    // Compute per-zone meter count and pipe length
+    var zoneMeter = {};
+    var zonePipe = {};
+    branches.forEach(function(b) {
+        var z = b.zone;
+        if (!zoneMeter[z]) zoneMeter[z] = 0;
+        if (!zonePipe[z]) zonePipe[z] = 0;
+        zoneMeter[z] += (b.layers || {}).meter || 0;
+        zonePipe[z] += b.pipe_long || 0;
+    });
+
     Object.keys(ZONE_CENTERS).forEach(function(zoneId) {
         var zd = zt[zoneId] || {};
-        var total = zd._total || 0;
-        var branches = zd._branches || 0;
+        var branchCount = zd._branches || 0;
+        var meterCount = zoneMeter[zoneId] || 0;
+        var pipeLong = zonePipe[zoneId] || 0;
         var el = document.getElementById('mapPop' + zoneId);
         if (el) {
-            el.innerHTML = formatNumber(total) + ' records<br>' +
-                '<span style="font-size:11px;color:#888;">' + branches + ' branches</span>';
+            el.innerHTML =
+                '<div style="font-size:12px;text-align:left;margin-top:4px;">' +
+                '<div style="display:flex;justify-content:space-between;margin-bottom:2px;">' +
+                '<span style="color:#666;">สาขา</span>' +
+                '<span style="font-weight:700;">' + branchCount + ' สาขา</span></div>' +
+                '<div style="display:flex;justify-content:space-between;margin-bottom:2px;">' +
+                '<span style="color:#666;">💧 จำนวนมาตรวัดน้ำ</span>' +
+                '<span style="font-weight:700;color:#3498DB;">' + formatNumber(meterCount) + ' เครื่อง</span></div>' +
+                '<div style="display:flex;justify-content:space-between;">' +
+                '<span style="color:#666;">📏 ความยาวท่อรวม</span>' +
+                '<span style="font-weight:700;color:#E67E22;">' + formatDecimal(pipeLong) + ' ม.</span></div>' +
+                '</div>';
         }
+    });
+
+    // Also add zone marker hover tooltips with meter/pipe data
+    Object.keys(ZONE_CENTERS).forEach(function(zoneId) {
+        var marker = zoneMarkers[zoneId];
+        if (!marker) return;
+        var meterCount = zoneMeter[zoneId] || 0;
+        var pipeLong = zonePipe[zoneId] || 0;
+        var color = ZONE_COLORS[parseInt(zoneId) - 1] || '#999';
+
+        marker.unbindTooltip();
+        marker.bindTooltip(
+            '<div style="font-family:\'IBM Plex Sans Thai\',sans-serif;min-width:200px;line-height:1.5;">' +
+            '<div style="font-weight:700;font-size:13px;color:' + color + ';margin-bottom:4px;">เขต ' + zoneId + '</div>' +
+            '<hr style="margin:0 0 4px 0;border:0;border-top:1px solid #e0e0e0;">' +
+            '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px;">' +
+            '<span style="color:#666;">💧 จำนวนมาตรวัดน้ำในเขต</span>' +
+            '<span style="font-weight:700;color:#3498DB;">' + formatNumber(meterCount) + ' เครื่อง</span></div>' +
+            '<div style="display:flex;justify-content:space-between;font-size:12px;">' +
+            '<span style="color:#666;">📏 ความยาวท่อรวมในเขต</span>' +
+            '<span style="font-weight:700;color:#E67E22;">' + formatDecimal(pipeLong) + ' ม.</span></div>' +
+            '</div>',
+            { direction: 'top', offset: [0, -25], className: 'zone-tooltip', sticky: false }
+        );
     });
 }
 
@@ -374,21 +422,25 @@ function renderStats(data) {
         .sort(function(a, b) { return b[1] - a[1]; })
         .slice(0, 3);
 
-    var stats = [
-        { label: 'Total Branches', value: formatNumber(totalBranches), color: 'blue', suffix: 'branches' },
-        { label: 'Total Features', value: formatNumber(totalFeatures), color: 'gold', suffix: 'records' },
-        { label: 'Zones', value: data.zone_names ? data.zone_names.length : 0, color: 'green', suffix: 'zones' }
-    ];
+    // Compute pipe length totals across all branches
+    var totalPipeLongM = 0;
+    (data.branches || []).forEach(function(b) { totalPipeLongM += b.pipe_long || 0; });
+    var totalPipeLongKm = totalPipeLongM / 1000;
 
-    topLayers.forEach(function(l, i) {
-        var dn = layerNames.find(function(ln) { return ln.name === l[0]; });
-        stats.push({
-            label: dn ? dn.display_name : l[0],
-            value: formatNumber(l[1]),
-            color: ['cyan', 'blue', 'green'][i % 3],
-            suffix: 'records'
-        });
-    });
+    // Get specific layer counts from grand total
+    var firehydrantCount = gt.firehydrant || 0;
+    var valveCount = gt.valve || 0;
+
+    var stats = [
+        { label: 'สาขาทั้งหมด', value: formatNumber(totalBranches), color: 'blue', suffix: 'สาขา' },
+        { label: 'ปริมาณข้อมูลทั้งหมด (features)', value: formatNumber(totalFeatures), color: 'gold', suffix: '' },
+        { label: 'เขต', value: data.zone_names ? data.zone_names.length : 0, color: 'green', suffix: 'เขต' },
+        { label: 'ความยาวท่อรวม (ม.)', value: formatDecimal(totalPipeLongM), color: 'cyan', suffix: '' },
+        { label: 'ความยาวท่อรวม (กม.)', value: formatDecimal(totalPipeLongKm), color: 'cyan', suffix: '' },
+        { label: 'หัวดับเพลิง', value: formatNumber(firehydrantCount), color: 'blue', suffix: 'records' },
+        { label: 'ประตูน้ำ', value: formatNumber(valveCount), color: 'green', suffix: 'records' },
+        { label: 'มาตรวัดน้ำ', value: formatNumber(gt.meter || 0), color: 'blue', suffix: 'records' }
+    ];
 
     container.innerHTML = stats.map(function(s, i) {
         return '<div class="stat-card ' + s.color + ' fade-in" style="animation-delay:' + (i * 0.05) + 's">' +
@@ -405,12 +457,12 @@ function renderZoneList(data) {
     var zt = data.zone_totals || {};
     var zoneNames = data.zone_names || [];
 
-    document.getElementById('totalZones').textContent = zoneNames.length + ' zones';
+    document.getElementById('totalZones').textContent = zoneNames.length + ' เขต';
 
     // "All zones" item
     var html = '<li class="zone-item active" onclick="selectZone(this,\'\')" data-zone="">' +
-        '<span class="zone-name">All Zones</span>' +
-        '<span class="zone-count">' + formatNumber(data.total_branches) + ' branches</span>' +
+        '<span class="zone-name">ข้อมูลทั้งหมด</span>' +
+        '<span class="zone-count">' + formatNumber(data.total_branches) + ' สาขา</span>' +
         '</li>';
 
     zoneNames.forEach(function(z) {
@@ -423,11 +475,11 @@ function renderZoneList(data) {
             '<div style="display:flex;align-items:center;gap:8px;">' +
             '<span style="width:12px;height:12px;border-radius:50%;background:' + color + ';display:inline-block;flex-shrink:0;"></span>' +
             '<div>' +
-            '<span class="zone-name">Zone ' + z + '</span>' +
+            '<span class="zone-name">เขต ' + z + '</span>' +
             '<div class="text-xs" style="color:var(--text-muted)">' + formatNumber(total) + ' records</div>' +
             '</div>' +
             '</div>' +
-            '<span class="zone-count">' + branchCount + ' branches</span>' +
+            '<span class="zone-count">' + branchCount + ' สาขา</span>' +
             '</li>';
     });
 
@@ -442,7 +494,7 @@ function selectZone(el, zone) {
     var filtered = allBranches;
     if (zone) {
         filtered = allBranches.filter(function(b) { return b.zone === zone; });
-        document.getElementById('detailTitle').textContent = 'Branches in Zone ' + zone;
+        document.getElementById('detailTitle').textContent = 'สาขาในเขต ' + zone;
 
         // Fly map to selected zone
         if (zoneMap && ZONE_CENTERS[zone]) {
@@ -450,7 +502,7 @@ function selectZone(el, zone) {
             if (zoneMarkers[zone]) zoneMarkers[zone].openPopup();
         }
     } else {
-        document.getElementById('detailTitle').textContent = 'All Branches';
+        document.getElementById('detailTitle').textContent = 'มาตรวัดน้ำทั้งหมด';
         if (zoneMap) zoneMap.flyTo([13.0, 101.0], 6, { duration: 0.8 });
     }
 
@@ -516,19 +568,24 @@ function renderLayerChart(data) {
     });
 }
 
-/** Render the branch list (right sidebar), sorted by total features descending. */
+/** Render the branch list (right sidebar), sorted by meter count descending. */
 function renderBranchList(branches) {
     var tbody = document.getElementById('branchTableBody');
-    document.getElementById('branchCountBadge').textContent = branches.length + ' branches';
+    document.getElementById('branchCountBadge').textContent = branches.length + ' สาขา';
 
-    var sorted = branches.slice().sort(function(a, b) { return b.total - a.total; });
+    var sorted = branches.slice().sort(function(a, b) {
+        var mA = (a.layers || {}).meter || 0;
+        var mB = (b.layers || {}).meter || 0;
+        return mB - mA;
+    });
 
     tbody.innerHTML = sorted.map(function(b, i) {
+        var meterCount = (b.layers || {}).meter || 0;
         return '<tr>' +
             '<td class="text-xs" style="color:var(--text-muted)">' + (i + 1) + '</td>' +
             '<td><span class="badge badge-blue">' + b.pwa_code + '</span></td>' +
             '<td class="text-sm">' + b.branch_name + '</td>' +
-            '<td class="num ' + (b.total === 0 ? 'zero' : '') + '">' + formatNumber(b.total) + '</td>' +
+            '<td class="num ' + (meterCount === 0 ? 'zero' : '') + '">' + formatNumber(meterCount) + '</td>' +
             '</tr>';
     }).join('');
 }
