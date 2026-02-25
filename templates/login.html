@@ -90,14 +90,17 @@
         .logo-badge {
             display: inline-flex;
             align-items: center; justify-content: center;
-            width: 72px; height: 72px;
+            width: 100px; height: 100px;
             background: linear-gradient(135deg, var(--pwa-blue), var(--pwa-blue-light));
-            border-radius: 18px;
-            font-size: 28px; font-weight: 700; color: #fff;
-            letter-spacing: 1px;
+            border-radius: 22px;
             margin-bottom: 20px;
             box-shadow: 0 8px 32px rgba(27,79,114,0.4), 0 0 0 1px rgba(255,255,255,0.05);
             position: relative; overflow: hidden;
+        }
+        .logo-badge img {
+            width: 80px; height: 80px;
+            object-fit: contain;
+            border-radius: 8px;
         }
         .logo-badge::after {
             content: '';
@@ -256,7 +259,7 @@
         <div class="login-container">
 
             <div class="login-header">
-                <div class="logo-badge">GIS</div>
+                <div class="logo-badge"><img src="{{.BasePath}}/static/images/pwa-logo.jpg" alt="PWA"></div>
                 <h1>PWA GIS Online Tracking</h1>
                 <p>ระบบติดตามข้อมูล GIS ออนไลน์ — การประปาส่วนภูมิภาค</p>
             </div>

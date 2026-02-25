@@ -1,7 +1,6 @@
 package routes
 
 import (
-
 	"pwa_gis_tracking/handlers"
 
 	"github.com/gin-gonic/gin"
@@ -26,12 +25,14 @@ func RegisterRoutes(router *gin.Engine) {
 		pub.GET("/logout", handlers.HandleLogout)
 	}
 
+	// ─── Static files (served WITHOUT auth so login page can load CSS/images) ──
+	// Single Static() call to avoid Gin wildcard conflict.
+	// Images, icons, CSS, JS are all under ./static/
+	router.Group(basePath).Static("/static", "./static")
+
 	// ─── Protected routes (session auth required) ─────────
 	base := router.Group(basePath, handlers.AuthRequired(basePath))
 	{
-		// Serve static files (CSS, JS)
-		base.Static("/static", "./static")
-
 		// HTML pages
 		base.GET("/", func(c *gin.Context) {
 			c.HTML(200, "dashboard.html", nil)
@@ -52,6 +53,9 @@ func RegisterRoutes(router *gin.Engine) {
 			api.GET("/dashboard", handlers.GetDashboardSummary)
 			api.GET("/export/excel", handlers.ExportExcel)
 			api.GET("/export/geodata", handlers.ExportGeoData)
+			api.GET("/features/map", handlers.GetFeaturesForMap)
+			api.GET("/features/properties", handlers.GetFeatureProps)
+			api.GET("/cache/invalidate", handlers.InvalidateCache)
 			api.GET("/debug/collection", handlers.DebugCollection)
 		}
 

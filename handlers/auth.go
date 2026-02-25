@@ -14,7 +14,7 @@ import (
 
 const (
 	cookieName    = "pwa_gis_session"
-	cookieMaxAge  = 86400 * 7 // 7 days
+	cookieMaxAge  = 7200 // 2 hours
 	defaultSecret = "pwa-gis-tracking-secret-key-2025"
 )
 
@@ -52,7 +52,7 @@ func signToken(username string) string {
 	return payload + "|" + sig
 }
 
-// verifyToken checks if the token is valid and not expired (7 days).
+// verifyToken checks if the token is valid and not expired (2 hours).
 func verifyToken(token string) (string, bool) {
 	parts := strings.SplitN(token, "|", 3)
 	if len(parts) != 3 {
@@ -73,7 +73,7 @@ func verifyToken(token string) (string, bool) {
 		return "", false
 	}
 
-	// Check expiry (7 days)
+	// Check expiry (2 hours)
 	var tsInt int64
 	fmt.Sscanf(ts, "%d", &tsInt)
 	if time.Now().Unix()-tsInt > int64(cookieMaxAge) {

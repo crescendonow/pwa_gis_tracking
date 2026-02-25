@@ -120,6 +120,15 @@ func GetDashboardSummary(c *gin.Context) {
 	startDate := c.Query("startDate")
 	endDate := c.Query("endDate")
 
+	// Check cache first — avoids 10+ second MongoDB aggregation
+	cacheKey := CacheKey("dashboard", zone, startDate, endDate)
+	if cached := GetCachedDashboard(cacheKey); cached != nil {
+		c.Header("X-Cache", "HIT")
+		c.Data(http.StatusOK, "application/json; charset=utf-8", cached)
+		return
+	}
+	c.Header("X-Cache", "MISS")
+
 	var officeList []struct {
 		PwaCode string
 		Name    string
@@ -237,14 +246,26 @@ func GetDashboardSummary(c *gin.Context) {
 		}
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"status":        "success",
-		"branches":      allResults,
-		"zone_totals":   zoneTotals,
-		"grand_total":   grandTotal,
-		"zone_names":    zoneNames,
+	response := gin.H{
+		"status":         "success",
+		"branches":       allResults,
+		"zone_totals":    zoneTotals,
+		"grand_total":    grandTotal,
+		"zone_names":     zoneNames,
 		"total_branches": len(allResults),
-	})
+	}
+
+	// Store in cache for subsequent requests
+	SetCachedDashboard(cacheKey, response)
+
+	c.JSON(http.StatusOK, response)
+}
+
+// InvalidateCache clears the dashboard cache (force refresh on next load).
+// GET /api/cache/invalidate
+func InvalidateCache(c *gin.Context) {
+	InvalidateDashboardCache()
+	c.JSON(http.StatusOK, gin.H{"status": "success", "message": "Cache invalidated"})
 }
 
 // ExportExcel generates and downloads an Excel summary report.
@@ -421,8 +442,9 @@ func DebugCollection(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 
-// ExportGeoData exports features as GeoJSON (or GeoPackage) for download.
+// ExportGeoData exports features as GeoJSON (or other formats) for download.
 // GET /api/export/geodata?pwaCode=xxx&collection=xxx&format=geojson&startDate=xxx&endDate=xxx
+// Supported formats: geojson, gpkg, shp, fgb, mbtiles
 func ExportGeoData(c *gin.Context) {
 	pwaCode := c.Query("pwaCode")
 	collection := c.Query("collection")
@@ -460,15 +482,106 @@ func ExportGeoData(c *gin.Context) {
 	filename := fmt.Sprintf("%s_%s", pwaCode, collection)
 
 	switch format {
-	case "gpkg":
-		// GPKG requires GDAL which is not available in pure Go.
-		// Fall back to GeoJSON; client can convert to GPKG offline.
+	case "geojson":
 		c.Header("Content-Type", "application/geo+json")
 		c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s.geojson", filename))
 		c.Data(http.StatusOK, "application/geo+json", geojsonData)
+
+	case "gpkg":
+		// TODO: Implement with go-sqlite3 + GeoPackage SQL spec
+		// For now, export as GeoJSON with note
+		c.Header("Content-Type", "application/geo+json")
+		c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s.geojson", filename))
+		c.Data(http.StatusOK, "application/geo+json", geojsonData)
+
+	case "shp":
+		// TODO: Implement with jonas-p/go-shp
+		c.Header("Content-Type", "application/geo+json")
+		c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s.geojson", filename))
+		c.Data(http.StatusOK, "application/geo+json", geojsonData)
+
+	case "fgb":
+		fgbData, fgbErr := services.ExportAsFlatGeobuf(pwaCode, collection, startDate, endDate)
+		if fgbErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "FlatGeobuf export failed: " + fgbErr.Error()})
+			return
+		}
+		c.Header("Content-Type", "application/octet-stream")
+		c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s.fgb", filename))
+		c.Data(http.StatusOK, "application/octet-stream", fgbData)
+
+	case "mbtiles":
+		// TODO: Implement with go-sqlite3 + MVT tile generation
+		c.Header("Content-Type", "application/geo+json")
+		c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s.geojson", filename))
+		c.Data(http.StatusOK, "application/geo+json", geojsonData)
+
 	default:
 		c.Header("Content-Type", "application/geo+json")
 		c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s.geojson", filename))
 		c.Data(http.StatusOK, "application/geo+json", geojsonData)
 	}
+}
+
+// GetFeaturesForMap returns lightweight GeoJSON for MapLibre map rendering.
+// Only geometry + _id; properties are loaded on-demand via GetFeatureProps.
+// GET /api/features/map?pwaCode=xxx&collection=xxx&startDate=xxx&endDate=xxx
+func GetFeaturesForMap(c *gin.Context) {
+	pwaCode := c.Query("pwaCode")
+	collection := c.Query("collection")
+	startDate := c.Query("startDate")
+	endDate := c.Query("endDate")
+
+	if pwaCode == "" || collection == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "pwaCode and collection are required"})
+		return
+	}
+
+	// Validate collection name
+	validLayers := services.GetAllLayerNames()
+	valid := false
+	for _, l := range validLayers {
+		if l == collection {
+			valid = true
+			break
+		}
+	}
+	if !valid {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid collection"})
+		return
+	}
+
+	data, err := services.ExportFeaturesForMap(pwaCode, collection, startDate, endDate)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.Header("Content-Type", "application/geo+json")
+	c.Data(http.StatusOK, "application/geo+json", data)
+}
+
+// GetFeatureProps returns full properties for a single feature (lazy-loaded on map click).
+// GET /api/features/properties?pwaCode=xxx&collection=xxx&featureId=xxx
+func GetFeatureProps(c *gin.Context) {
+	pwaCode := c.Query("pwaCode")
+	collection := c.Query("collection")
+	featureID := c.Query("featureId")
+
+	if pwaCode == "" || collection == "" || featureID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "pwaCode, collection, and featureId are required"})
+		return
+	}
+
+	props, err := services.GetFeatureProperties(pwaCode, collection, featureID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":     "success",
+		"feature_id": featureID,
+		"properties": props,
+	})
 }

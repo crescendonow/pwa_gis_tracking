@@ -15,6 +15,7 @@ import (
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
@@ -164,64 +165,6 @@ func CountAllLayersForBranch(pwaCode string, startDate, endDate string) (map[str
 	close(errChan)
 
 	return result, nil
-}
-
-// SumPipeLength sums the "length" field from the pipe collection for a branch.
-// Returns the total pipe length in meters. Uses MongoDB $sum aggregation.
-func SumPipeLength(pwaCode string, startDate, endDate string) (float64, error) {
-	collectionID, err := FindCollectionID(pwaCode, "pipe")
-	if err != nil {
-		return 0, nil // No pipe collection = 0 length
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	featuresCol := config.GetMongoCollection(fmt.Sprintf("features_%s", collectionID))
-
-	// Build match stage with optional date filter
-	matchStage := bson.M{}
-	if startDate != "" || endDate != "" {
-		dateField := "properties.recordDate"
-		dateFilter := buildDateFilter(dateField, startDate, endDate)
-		if dateFilter != nil {
-			matchStage = dateFilter
-		}
-	}
-
-	// Aggregation pipeline: match → group → sum length
-	pipeline := []bson.M{
-		{"$match": matchStage},
-		{"$group": bson.M{
-			"_id": nil,
-			"total_length": bson.M{
-				"$sum": bson.M{
-					"$toDouble": bson.M{
-						"$ifNull": []interface{}{"$properties.length", 0},
-					},
-				},
-			},
-		}},
-	}
-
-	cursor, err := featuresCol.Aggregate(ctx, pipeline)
-	if err != nil {
-		log.Printf("SumPipeLength aggregate failed for %s: %v", pwaCode, err)
-		return 0, nil
-	}
-	defer cursor.Close(ctx)
-
-	var result struct {
-		TotalLength float64 `bson:"total_length"`
-	}
-	if cursor.Next(ctx) {
-		if err := cursor.Decode(&result); err != nil {
-			log.Printf("SumPipeLength decode failed for %s: %v", pwaCode, err)
-			return 0, nil
-		}
-	}
-
-	return result.TotalLength, nil
 }
 
 // GetBranchCountsSummary returns feature counts for all branches (concurrent).
@@ -412,6 +355,206 @@ func cleanBsonForJSON(v interface{}) interface{} {
 	default:
 		return v
 	}
+}
+
+// SumPipeLength aggregates the total pipe length (in meters) for a branch.
+// Reads properties.PIPE_LONG from the pipe collection and sums it.
+// Handles both numeric and string values using $toDouble with $ifNull fallback.
+// Also tries alternative field names: PIPE_LONG, pipe_long, pipeLength, PIPE_LEN.
+func SumPipeLength(pwaCode string, startDate, endDate string) (float64, error) {
+	collectionID, err := FindCollectionID(pwaCode, "pipe")
+	if err != nil {
+		return 0, nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	featuresCol := config.GetMongoCollection(fmt.Sprintf("features_%s", collectionID))
+	filter := bson.M{}
+	if startDate != "" || endDate != "" {
+		dateFilter := buildDateFilter("properties.recordDate", startDate, endDate)
+		if dateFilter != nil {
+			filter = dateFilter
+		}
+	}
+
+	// Try each possible field name for pipe length
+	fieldNames := []string{"length", "PIPE_LONG", "pipe_long", "pipeLength", "PIPE_LEN", "pipe_len"}
+	for _, fieldName := range fieldNames {
+		total := sumFieldAsDouble(ctx, featuresCol, filter, "properties."+fieldName)
+		if total > 0 {
+			return total, nil
+		}
+	}
+
+	return 0, nil
+}
+
+// sumFieldAsDouble aggregates $sum on a field, converting string values to double.
+func sumFieldAsDouble(ctx context.Context, col *mongo.Collection, filter bson.M, field string) float64 {
+	pipeline := []bson.M{
+		{"$match": filter},
+		{"$group": bson.M{
+			"_id": nil,
+			"total": bson.M{
+				"$sum": bson.M{
+					"$convert": bson.M{
+						"input":   "$" + field,
+						"to":      "double",
+						"onError": 0,
+						"onNull":  0,
+					},
+				},
+			},
+		}},
+	}
+
+	cursor, err := col.Aggregate(ctx, pipeline)
+	if err != nil {
+		return 0
+	}
+	defer cursor.Close(ctx)
+
+	var result struct {
+		Total float64 `bson:"total"`
+	}
+	if cursor.Next(ctx) {
+		if err := cursor.Decode(&result); err != nil {
+			return 0
+		}
+	}
+	return result.Total
+}
+
+// ExportFeaturesForMap returns lightweight GeoJSON for map rendering.
+// Only includes geometry + _id + typeId (for pipe coloring); properties loaded on-demand.
+func ExportFeaturesForMap(pwaCode, layerName, startDate, endDate string) ([]byte, error) {
+	collectionID, err := FindCollectionID(pwaCode, layerName)
+	if err != nil {
+		return nil, fmt.Errorf("collection not found: %s_%s", pwaCode, layerName)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	defer cancel()
+
+	featuresCol := config.GetMongoCollection(fmt.Sprintf("features_%s", collectionID))
+
+	filter := bson.M{}
+	if startDate != "" || endDate != "" {
+		layerCfg := LayerConfigs[layerName]
+		dateField := "properties." + layerCfg.DateField
+		dateFilter := buildDateFilter(dateField, startDate, endDate)
+		if dateFilter != nil {
+			filter = dateFilter
+		}
+	}
+
+	// Lightweight projection: geometry + _id + typeId for pipe coloring
+	projection := options.Find().SetProjection(bson.M{
+		"geometry":          1,
+		"_id":               1,
+		"properties.typeId": 1,
+	})
+
+	cursor, err := featuresCol.Find(ctx, filter, projection)
+	if err != nil {
+		return nil, fmt.Errorf("query failed: %v", err)
+	}
+	defer cursor.Close(ctx)
+
+	type Feature struct {
+		Type       string                 `json:"type"`
+		ID         string                 `json:"id,omitempty"`
+		Geometry   interface{}            `json:"geometry"`
+		Properties map[string]interface{} `json:"properties"`
+	}
+
+	features := []Feature{}
+	for cursor.Next(ctx) {
+		var doc bson.M
+		if err := cursor.Decode(&doc); err != nil {
+			continue
+		}
+
+		geom := doc["geometry"]
+		if geom == nil {
+			continue
+		}
+
+		// Extract _id as string
+		var featureID string
+		if oid, ok := doc["_id"].(primitive.ObjectID); ok {
+			featureID = oid.Hex()
+		}
+
+		// Extract minimal properties (typeId for pipe color matching)
+		props := make(map[string]interface{})
+		props["_fid"] = featureID
+		if p, ok := doc["properties"].(bson.M); ok {
+			if typeId, exists := p["typeId"]; exists {
+				props["typeId"] = fmt.Sprintf("%v", typeId)
+			}
+		}
+
+		features = append(features, Feature{
+			Type:       "Feature",
+			ID:         featureID,
+			Geometry:   cleanBsonForJSON(geom),
+			Properties: props,
+		})
+	}
+
+	fc := map[string]interface{}{
+		"type":     "FeatureCollection",
+		"features": features,
+	}
+
+	return json.Marshal(fc)
+}
+
+// GetFeatureProperties returns full properties for a single feature by ObjectID.
+// Used for lazy-loading on map click.
+func GetFeatureProperties(pwaCode, layerName, featureID string) (map[string]interface{}, error) {
+	collectionID, err := FindCollectionID(pwaCode, layerName)
+	if err != nil {
+		return nil, fmt.Errorf("collection not found: %s_%s", pwaCode, layerName)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	featuresCol := config.GetMongoCollection(fmt.Sprintf("features_%s", collectionID))
+
+	oid, err := primitive.ObjectIDFromHex(featureID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid feature ID: %s", featureID)
+	}
+
+	var doc bson.M
+	err = featuresCol.FindOne(ctx, bson.M{"_id": oid}, options.FindOne().SetProjection(bson.M{
+		"properties": 1,
+		"_id":        0,
+	})).Decode(&doc)
+	if err != nil {
+		return nil, fmt.Errorf("feature not found: %s", featureID)
+	}
+
+	props := make(map[string]interface{})
+	if p, ok := doc["properties"].(bson.M); ok {
+		for k, v := range p {
+			switch val := v.(type) {
+			case primitive.DateTime:
+				props[k] = val.Time().Format(time.RFC3339)
+			case bson.M, bson.A:
+				continue
+			default:
+				props[k] = v
+			}
+		}
+	}
+
+	return props, nil
 }
 
 // GetYearsFromRecordDate returns a list of years that have recorded data.

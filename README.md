@@ -20,6 +20,22 @@ pwa-gis-tracking/
 │   ├── dashboard.html         # หน้า 1: ภาพรวมตามเขต + pie charts
 │   └── detail.html            # หน้า 2: รายละเอียดสาขา + export
     └── login.html 
+static/
+├── icons/          ← วาง SVG จาก outputs/static/icons/
+│   ├── Valve.svg
+│   ├── FireHydrant.svg
+│   ├── Meter.svg
+│   ├── BLDG.svg
+│   ├── Leakpoint.svg
+│   └── PWASmall.svg
+├── images/         ← วาง logo จาก outputs/static/images/
+│   └── pwa-logo.jpg
+├── css/
+│   └── style.css
+└── js/
+    ├── dashboard.js
+    ├── detail.js
+    └── thai_custom_date.js
     ├── css/style.css           # Custom dark theme (IBM Plex Sans Thai)
     └── js/
         ├── dashboard.js        # Dashboard logic + Chart.js
