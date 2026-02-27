@@ -427,7 +427,7 @@ func DebugCollection(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "pwaCode is required"})
 		return
 	}
-	dbName := config.MongoDB.Name()
+	dbName := config.MongoDBName
 	alias := fmt.Sprintf("b%s_%s", pwaCode, layer)
 	collectionID, err := services.FindCollectionID(pwaCode, layer)
 	result := gin.H{"database": dbName, "alias_query": alias, "collection_id": collectionID, "error": ""}

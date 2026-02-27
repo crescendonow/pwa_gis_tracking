@@ -37,6 +37,9 @@ func RegisterRoutes(router *gin.Engine) {
 		base.GET("/", func(c *gin.Context) {
 			c.HTML(200, "dashboard.html", nil)
 		})
+		base.GET("/dashboard.html", func(c *gin.Context) {
+			c.Redirect(301, basePath+"/")
+		})
 		base.GET("/detail", func(c *gin.Context) {
 			c.HTML(200, "detail.html", nil)
 		})

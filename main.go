@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"pwa_gis_tracking/config"
+	"pwa_gis_tracking/handlers"
 	"pwa_gis_tracking/routes"
 
 	"github.com/gin-gonic/gin"
@@ -22,6 +23,9 @@ func main() {
 	config.ConnectPostgres()
 	config.ConnectMongoDB()
 
+	// Initialize gorilla/sessions cookie store (must be before routes)
+	config.InitSessionStore()
+
 	// Initialize Gin router in release mode
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.Default()
@@ -37,6 +41,9 @@ func main() {
 		}
 		c.Next()
 	})
+
+	// Start background cache cleaner (removes expired entries every minute)
+	handlers.StartCacheCleaner()
 
 	// Register all routes
 	routes.RegisterRoutes(router)

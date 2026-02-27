@@ -58,7 +58,7 @@ func FindCollectionID(pwaCode string, featureType string) (string, error) {
 	alias := fmt.Sprintf("%s_%s", code, featureType)
 	metaCollection := config.GetMongoCollection("collections")
 
-	log.Printf("FindCollectionID: alias=%s, db=%s", alias, config.MongoDB.Name())
+	log.Printf("FindCollectionID: alias=%s, db=%s", alias, config.MongoDBName)
 
 	var result struct {
 		ID primitive.ObjectID `bson:"_id"`

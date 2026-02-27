@@ -3,86 +3,90 @@ package config
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"log"
 	"os"
 	"time"
 
-	_ "github.com/lib/pq"
+	_ "github.com/jackc/pgx/v5/stdlib" // pgx driver registered as "pgx"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-var (
-	PgDB    *sql.DB
-	MongoDB *mongo.Database
-)
+// PgDB is the shared PostgreSQL connection pool.
+var PgDB *sql.DB
 
-// ConnectPostgres connects to PostgreSQL
+// MongoDB is the shared MongoDB client.
+var MongoDB *mongo.Client
+
+// LoginLogFile is the shared file handle for writing login audit entries.
+// Set by main.go before any handlers are called.
+var LoginLogFile *os.File
+
+// ConnectPostgres opens the PostgreSQL connection pool and verifies it.
 func ConnectPostgres() {
-	host := os.Getenv("PG_HOST")
-	port := os.Getenv("PG_PORT")
-	dbname := os.Getenv("PG_DATABASE")
-	user := os.Getenv("PG_USER")
-	password := os.Getenv("PG_PASSWORD")
-
-	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
-		host, port, user, password, dbname)
-
-	var err error
-	PgDB, err = sql.Open("postgres", dsn)
-	if err != nil {
-		log.Fatal("Failed to connect to PostgreSQL:", err)
+	dsn := os.Getenv("POSTGRES_DSN")
+	if dsn == "" {
+		// Build DSN from individual env vars so operators have both options.
+		dsn = buildPgDSN()
 	}
 
-	PgDB.SetMaxOpenConns(10)
-	PgDB.SetMaxIdleConns(5)
-	PgDB.SetConnMaxLifetime(5 * time.Minute)
-
-	err = PgDB.Ping()
+	db, err := sql.Open("pgx", dsn)
 	if err != nil {
-		log.Fatal("Failed to ping PostgreSQL:", err)
+		log.Fatalf("postgres open error: %v", err)
 	}
 
-	fmt.Println("✅ Connected to PostgreSQL successfully!")
+	db.SetMaxOpenConns(10)
+	db.SetMaxIdleConns(5)
+	db.SetConnMaxLifetime(30 * time.Minute)
+
+	if err := db.Ping(); err != nil {
+		log.Fatalf("postgres ping failed: %v", err)
+	}
+
+	// Force UTF-8 encoding for Thai text support
+	if _, err := db.Exec("SET client_encoding TO 'UTF8'"); err != nil {
+		log.Printf("warning: could not set client_encoding: %v", err)
+	}
+
+	PgDB = db
+	log.Println("PostgreSQL connected")
 }
 
-// ConnectMongoDB connects to MongoDB
+func buildPgDSN() string {
+	host := getEnvOrDefault("PG_HOST", "localhost")
+	port := getEnvOrDefault("PG_PORT", "5432")
+	user := getEnvOrDefault("PG_USER", "postgres")
+	pass := getEnvOrDefault("PG_PASS", "")
+	dbname := getEnvOrDefault("PG_DB", "postgres")
+	sslmode := getEnvOrDefault("PG_SSLMODE", "disable")
+	return "host=" + host + " port=" + port +
+		" user=" + user + " password=" + pass +
+		" dbname=" + dbname + " sslmode=" + sslmode +
+		" client_encoding=UTF8"
+}
+
+// ConnectMongoDB opens the MongoDB client and verifies the connection.
 func ConnectMongoDB() {
-	uri := os.Getenv("MONGODB_URI")
-	if uri == "" {
-		// Fallback: ลองใช้ MONGO_URI (ตรงกับ Python config)
-		uri = os.Getenv("MONGO_URI")
-	}
-	if uri == "" {
-		log.Fatal("❌ MONGODB_URI or MONGO_URI is not set")
-	}
-
-	dbName := os.Getenv("MONGO_DATABASE")
-	if dbName == "" {
-		dbName = "vallaris_feature" // default ตรงกับ Python
-		log.Printf("⚠️ MONGO_DATABASE not set, using default: %s", dbName)
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	MongoDBName = getEnvOrDefault("MONGO_DB_NAME", "pwa_gis_tracking")
+	uri := getEnvOrDefault("MONGO_URI", "mongodb://localhost:27017")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	clientOpts := options.Client().ApplyURI(uri)
-	client, err := mongo.Connect(ctx, clientOpts)
+	client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI(uri))
 	if err != nil {
-		log.Fatal("Failed to connect to MongoDB:", err)
+		log.Fatalf("mongo connect error: %v", err)
+	}
+	if err := client.Ping(ctx, nil); err != nil {
+		log.Fatalf("mongo ping failed: %v", err)
 	}
 
-	err = client.Ping(ctx, nil)
-	if err != nil {
-		log.Fatal("Failed to ping MongoDB:", err)
-	}
-
-	MongoDB = client.Database(dbName)
-	fmt.Printf("✅ Connected to MongoDB successfully! (database: %s)\n", dbName)
+	MongoDB = client
+	log.Println("MongoDB connected")
 }
 
-// GetMongoCollection returns a MongoDB collection
-func GetMongoCollection(name string) *mongo.Collection {
-	return MongoDB.Collection(name)
+func getEnvOrDefault(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
 }
