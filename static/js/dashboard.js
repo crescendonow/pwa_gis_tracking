@@ -187,7 +187,8 @@ function initZoneMap() {
     });
 
     // Load individual branch markers from database geometry
-    loadBranchMarkers();
+    // Store promise so updateBranchTooltips can await it
+    window._branchMarkersReady = loadBranchMarkers();
 }
 
 /**
@@ -253,7 +254,11 @@ async function loadBranchMarkers() {
  * Enrich branch marker tooltips with meter count and pipe length.
  * Called after dashboard data loads.
  */
-function updateBranchTooltips() {
+async function updateBranchTooltips() {
+    // Wait for branch markers to finish loading (fix race condition)
+    if (window._branchMarkersReady) {
+        await window._branchMarkersReady;
+    }
     if (!allBranches || !allBranches.length) return;
 
     allBranches.forEach(function(b) {
@@ -395,7 +400,7 @@ async function loadDashboard() {
             renderBranchList(allBranches);
             renderFullTable(allBranches);
             updateMapPopups(data);
-            updateBranchTooltips();
+            await updateBranchTooltips();
         }
     } catch (e) {
         console.error('Dashboard load error:', e);

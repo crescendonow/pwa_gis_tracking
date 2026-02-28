@@ -45,7 +45,7 @@ func RegisterRoutes(router *gin.Engine) {
 		})
 
 		// REST API endpoints
-		api := base.Group("/api")
+		api := base.Group("/api", handlers.AuditLogMiddleware())
 		{
 			api.GET("/zones", handlers.GetZones)
 			api.GET("/offices", handlers.GetOffices)
@@ -64,6 +64,8 @@ func RegisterRoutes(router *gin.Engine) {
 			api.GET("/cache/status", handlers.GetCacheStatus)
 			api.GET("/features/list", handlers.GetFeaturesList)
 			api.GET("/field-mapping", handlers.GetFieldMapping)
+			// Session info (for permission-aware UI)
+			api.GET("/session/info", handlers.GetSessionInfo)
 		}
 
 		// Health check

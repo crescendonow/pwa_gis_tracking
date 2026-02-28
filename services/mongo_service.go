@@ -428,7 +428,7 @@ func sumFieldAsDouble(ctx context.Context, col *mongo.Collection, filter bson.M,
 }
 
 // ExportFeaturesForMap returns lightweight GeoJSON for map rendering.
-// Only includes geometry + _id + typeId (for pipe coloring); properties loaded on-demand.
+// Only includes geometry + _id + sizeId (for pipe coloring by diameter); properties loaded on-demand.
 func ExportFeaturesForMap(pwaCode, layerName, startDate, endDate string) ([]byte, error) {
 	collectionID, err := FindCollectionID(pwaCode, layerName)
 	if err != nil {
@@ -450,11 +450,11 @@ func ExportFeaturesForMap(pwaCode, layerName, startDate, endDate string) ([]byte
 		}
 	}
 
-	// Lightweight projection: geometry + _id + typeId for pipe coloring
+	// Lightweight projection: geometry + _id + sizeId (for pipe coloring by diameter)
 	projection := options.Find().SetProjection(bson.M{
-		"geometry":          1,
-		"_id":               1,
-		"properties.typeId": 1,
+		"geometry":           1,
+		"_id":                1,
+		"properties.sizeId":  1,
 	})
 
 	cursor, err := featuresCol.Find(ctx, filter, projection)
@@ -488,12 +488,12 @@ func ExportFeaturesForMap(pwaCode, layerName, startDate, endDate string) ([]byte
 			featureID = oid.Hex()
 		}
 
-		// Extract minimal properties (typeId for pipe color matching)
+		// Extract minimal properties (sizeId for pipe color matching by diameter)
 		props := make(map[string]interface{})
 		props["_fid"] = featureID
 		if p, ok := doc["properties"].(bson.M); ok {
-			if typeId, exists := p["typeId"]; exists {
-				props["typeId"] = fmt.Sprintf("%v", typeId)
+			if sizeId, exists := p["sizeId"]; exists {
+				props["sizeId"] = fmt.Sprintf("%v", sizeId)
 			}
 		}
 

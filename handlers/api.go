@@ -495,6 +495,7 @@ func ExportGeoData(c *gin.Context) {
 	case "geojson":
 		c.Header("Content-Type", "application/geo+json")
 		c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s.geojson", filename))
+		LogAuditEvent(c, "export_geojson", "export", fmt.Sprintf("%s:%s", pwaCode, collection))
 		c.Data(http.StatusOK, "application/geo+json", geojsonData)
 
 	case "tab":
@@ -505,6 +506,7 @@ func ExportGeoData(c *gin.Context) {
 		}
 		c.Header("Content-Type", "application/zip")
 		c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s_tab.zip", filename))
+		LogAuditEvent(c, "export_tab", "export", fmt.Sprintf("%s:%s", pwaCode, collection))
 		c.Data(http.StatusOK, "application/zip", tabData)
 
 	case "pmtiles":
@@ -518,17 +520,26 @@ func ExportGeoData(c *gin.Context) {
 		c.Data(http.StatusOK, "application/octet-stream", pmData)
 
 	case "gpkg":
-		// TODO: Implement with go-sqlite3 + GeoPackage SQL spec
-		// For now, export as GeoJSON with note
-		c.Header("Content-Type", "application/geo+json")
-		c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s.geojson", filename))
-		c.Data(http.StatusOK, "application/geo+json", geojsonData)
+		gpkgData, gpkgErr := services.ExportAsGeoPackage(pwaCode, collection, startDate, endDate)
+		if gpkgErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "GPKG export failed: " + gpkgErr.Error()})
+			return
+		}
+		LogAuditEvent(c, "export_gpkg", "export", fmt.Sprintf("%s:%s", pwaCode, collection))
+		c.Header("Content-Type", "application/geopackage+sqlite3")
+		c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s.gpkg", filename))
+		c.Data(http.StatusOK, "application/geopackage+sqlite3", gpkgData)
 
 	case "shp":
-		// TODO: Implement with jonas-p/go-shp
-		c.Header("Content-Type", "application/geo+json")
-		c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s.geojson", filename))
-		c.Data(http.StatusOK, "application/geo+json", geojsonData)
+		shpData, shpErr := services.ExportAsShapefile(pwaCode, collection, startDate, endDate)
+		if shpErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Shapefile export failed: " + shpErr.Error()})
+			return
+		}
+		LogAuditEvent(c, "export_shp", "export", fmt.Sprintf("%s:%s", pwaCode, collection))
+		c.Header("Content-Type", "application/zip")
+		c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s_shp.zip", filename))
+		c.Data(http.StatusOK, "application/zip", shpData)
 
 	case "fgb":
 		fgbData, fgbErr := services.ExportAsFlatGeobuf(pwaCode, collection, startDate, endDate)
@@ -538,18 +549,20 @@ func ExportGeoData(c *gin.Context) {
 		}
 		c.Header("Content-Type", "application/octet-stream")
 		c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s.fgb", filename))
+		LogAuditEvent(c, "export_fgb", "export", fmt.Sprintf("%s:%s", pwaCode, collection))
 		c.Data(http.StatusOK, "application/octet-stream", fgbData)
 
 	case "mbtiles":
-		// TODO: Implement with go-sqlite3 + MVT tile generation
-		c.Header("Content-Type", "application/geo+json")
-		c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s.geojson", filename))
-		c.Data(http.StatusOK, "application/geo+json", geojsonData)
-
-	default:
-		c.Header("Content-Type", "application/geo+json")
-		c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s.geojson", filename))
-		c.Data(http.StatusOK, "application/geo+json", geojsonData)
+		// Same as PMTiles (MBTiles ต้องใช้ tippecanoe/ogr2ogr)
+		pmData, pmErr := services.ExportAsPMTiles(pwaCode, collection, startDate, endDate)
+		if pmErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "MBTiles export failed: " + pmErr.Error()})
+			return
+		}
+		LogAuditEvent(c, "export_mbtiles", "export", fmt.Sprintf("%s:%s", pwaCode, collection))
+		c.Header("Content-Type", "application/octet-stream")
+		c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s.mbtiles", filename))
+		c.Data(http.StatusOK, "application/octet-stream", pmData)
 	}
 }
 
