@@ -1,259 +1,594 @@
 <!DOCTYPE html>
 <html lang="th">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>PWA GIS Online Tracking - รายละเอียด</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <!-- Flatpickr -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css"
+    />
     <!-- MapLibre GL JS -->
-    <link href="https://unpkg.com/maplibre-gl@4.5.0/dist/maplibre-gl.css" rel="stylesheet">
+    <link
+      href="https://unpkg.com/maplibre-gl@4.5.0/dist/maplibre-gl.css"
+      rel="stylesheet"
+    />
     <script src="https://unpkg.com/maplibre-gl@4.5.0/dist/maplibre-gl.js"></script>
-    <link rel="stylesheet" href="/pwa_gis_tracking/static/css/style.css">
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🗺️</text></svg>">
+    <link rel="stylesheet" href="/pwa_gis_tracking/static/css/style.css" />
+    <!-- FontAwesome (needed for hamburger icon + logout) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <!-- Responsive style -->
+    <link rel="stylesheet" href="/pwa_gis_tracking/static/css/responsive.css" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🗺️</text></svg>"
+    />
     <style>
-        #detailMapContainer { display: none; }
-        #detailMap { width: 100%; height: 500px; border-radius: 0 0 8px 8px; }
-        .maplibregl-popup-content {
-            background: #1C2538; color: #F1F5F9;
-            border: 1px solid rgba(148,163,184,0.15);
-            border-radius: 10px; padding: 0;
-            max-width: 380px; max-height: 420px;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
-            font-family: 'IBM Plex Sans Thai', sans-serif;
-        }
-        .maplibregl-popup-close-button { color: #94A3B8; font-size: 18px; padding: 4px 8px; }
-        .maplibregl-popup-close-button:hover { color: #fff; }
-        .maplibregl-popup-tip { border-top-color: #1C2538; }
-        .popup-header {
-            padding: 10px 14px; border-bottom: 1px solid rgba(148,163,184,0.1);
-            font-weight: 600; font-size: 13px; color: #D4A843;
-        }
-        .popup-body {
-            padding: 8px 14px; max-height: 300px; overflow-y: auto; font-size: 12px;
-        }
-        .popup-body table { width: 100%; border-collapse: collapse; }
-        .popup-body td { padding: 3px 0; border-bottom: 1px solid rgba(148,163,184,0.05); vertical-align: top; }
-        .popup-body td:first-child { color: #94A3B8; font-weight: 500; padding-right: 10px; white-space: nowrap; width: 40%; }
-        .popup-body td:last-child { color: #F1F5F9; word-break: break-all; }
-        .popup-loading { padding: 20px; text-align: center; color: #94A3B8; }
-        .popup-loading .spinner-sm {
-            display: inline-block; width: 20px; height: 20px;
-            border: 2px solid rgba(148,163,184,0.2); border-top-color: #D4A843;
-            border-radius: 50%; animation: spin 0.6s linear infinite; margin-bottom: 6px;
-        }
-        .map-footer { padding: 8px 20px; font-size: 12px; color: #64748B; display: flex; align-items: center; justify-content: space-between; }
+      #detailMapContainer {
+        display: none;
+      }
+      #detailMap {
+        width: 100%;
+        height: 500px;
+        border-radius: 0 0 8px 8px;
+      }
+      .maplibregl-popup-content {
+        background: #1c2538;
+        color: #f1f5f9;
+        border: 1px solid rgba(148, 163, 184, 0.15);
+        border-radius: 10px;
+        padding: 0;
+        max-width: 380px;
+        max-height: 420px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        font-family: "IBM Plex Sans Thai", sans-serif;
+      }
+      .maplibregl-popup-close-button {
+        color: #94a3b8;
+        font-size: 18px;
+        padding: 4px 8px;
+      }
+      .maplibregl-popup-close-button:hover {
+        color: #fff;
+      }
+      .maplibregl-popup-tip {
+        border-top-color: #1c2538;
+      }
+      .popup-header {
+        padding: 10px 14px;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+        font-weight: 600;
+        font-size: 13px;
+        color: #d4a843;
+      }
+      .popup-body {
+        padding: 8px 14px;
+        max-height: 300px;
+        overflow-y: auto;
+        font-size: 12px;
+      }
+      .popup-body table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      .popup-body td {
+        padding: 3px 0;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.05);
+        vertical-align: top;
+      }
+      .popup-body td:first-child {
+        color: #94a3b8;
+        font-weight: 500;
+        padding-right: 10px;
+        white-space: nowrap;
+        width: 40%;
+      }
+      .popup-body td:last-child {
+        color: #f1f5f9;
+        word-break: break-all;
+      }
+      .popup-loading {
+        padding: 20px;
+        text-align: center;
+        color: #94a3b8;
+      }
+      .popup-loading .spinner-sm {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 2px solid rgba(148, 163, 184, 0.2);
+        border-top-color: #d4a843;
+        border-radius: 50%;
+        animation: spin 0.6s linear infinite;
+        margin-bottom: 6px;
+      }
+      .map-footer {
+        padding: 8px 20px;
+        font-size: 12px;
+        color: #64748b;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
     </style>
-</head>
-<body>
+  </head>
+  <body>
     <!-- Loading Overlay -->
-    <div id="loadingOverlay" class="loading-overlay" style="display:none;">
-        <div class="spinner"></div>
-        <div class="loading-text" id="loadingText">กำลังโหลดข้อมูล...</div>
-        <div class="loading-progress" id="loadingProgress"></div>
+    <div id="loadingOverlay" class="loading-overlay" style="display: none">
+      <div class="spinner"></div>
+      <div class="loading-text" id="loadingText">กำลังโหลดข้อมูล...</div>
+      <div class="loading-progress" id="loadingProgress"></div>
     </div>
 
     <!-- Top Navigation -->
     <nav class="top-nav">
-        <div class="max-w-screen-2xl mx-auto px-4 py-3 flex items-center justify-between">
-            <div class="nav-brand">
-                <div class="logo-icon">GIS</div>
-                <div>
-                    <h1>PWA GIS Online Tracking</h1>
-                    <span>ระบบติดตามข้อมูล GIS ออนไลน์</span>
-                </div>
-            </div>
-            <div class="flex items-center gap-2">
-                <a href="/pwa_gis_tracking/" class="nav-link">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-                    ภาพรวม
-                </a>
-                <a href="/pwa_gis_tracking/detail" class="nav-link active">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-                    รายละเอียด
-                </a>
-            </div>
+      <div
+        class="max-w-screen-2xl mx-auto px-4 py-3 flex items-center justify-between"
+      >
+        <div class="nav-brand">
+          <div class="logo-icon">GIS</div>
+          <div>
+            <h1>PWA GIS Online Tracking</h1>
+            <span>ระบบติดตามข้อมูล GIS ออนไลน์</span>
+          </div>
         </div>
+        <button
+          class="mobile-menu-btn"
+          onclick="toggleMobileMenu()"
+          aria-label="เมนู"
+        >
+          <i class="fa-solid fa-bars" id="menuIcon"></i>
+        </button>
+        <div class="flex items-center gap-2" id="navLinks">
+          <a href="/pwa_gis_tracking/" class="nav-link">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <rect x="3" y="3" width="7" height="7" />
+              <rect x="14" y="3" width="7" height="7" />
+              <rect x="3" y="14" width="7" height="7" />
+              <rect x="14" y="14" width="7" height="7" />
+            </svg>
+            ภาพรวม
+          </a>
+          <a href="/pwa_gis_tracking/detail" class="nav-link active">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path
+                d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+              />
+              <polyline points="14 2 14 8 20 8" />
+              <line x1="16" y1="13" x2="8" y2="13" />
+              <line x1="16" y1="17" x2="8" y2="17" />
+            </svg>
+            รายละเอียด
+          </a>
+          <a href="/pwa_gis_tracking/logout" class="nav-link" style="color:var(--text-muted);">
+              <i class="fa-solid fa-right-from-bracket"></i> ออกจากระบบ
+          </a>
+        </div>
+      </div>
     </nav>
 
     <!-- Main Content -->
     <main class="max-w-screen-2xl mx-auto px-4 py-6 relative z-10">
+      <!-- Step 1: Select Branch & Layer -->
+      <div class="card mb-6 fade-in">
+        <div class="card-header">
+          <h3>
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <circle cx="11" cy="11" r="8" />
+              <path d="m21 21-4.3-4.3" />
+            </svg>
+            เลือกสาขาและชั้นข้อมูล
+          </h3>
+        </div>
+        <div class="card-body">
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+            <div>
+              <label class="filter-label mb-1 block">เขต</label>
+              <select
+                id="detailZone"
+                onchange="onDetailZoneChange()"
+                class="w-full"
+              >
+                <option value="">เลือกเขต</option>
+              </select>
+            </div>
+            <div>
+              <label class="filter-label mb-1 block">สาขา</label>
+              <select id="detailBranch" class="w-full">
+                <option value="">เลือกสาขา</option>
+              </select>
+            </div>
+            <div>
+              <label class="filter-label mb-1 block">ชั้นข้อมูล</label>
+              <select id="detailLayer" class="w-full">
+                <option value="">ทุกชั้นข้อมูล</option>
+              </select>
+            </div>
+            <div>
+              <label class="filter-label mb-1 block">วันที่เริ่ม</label>
+              <input
+                type="text"
+                id="detailStartDate"
+                class="w-full"
+                placeholder="เลือกวันที่"
+                readonly
+              />
+            </div>
+            <div>
+              <label class="filter-label mb-1 block">วันที่สิ้นสุด</label>
+              <input
+                type="text"
+                id="detailEndDate"
+                class="w-full"
+                placeholder="เลือกวันที่"
+                readonly
+              />
+            </div>
+            <div class="flex items-end gap-2">
+              <button
+                class="btn btn-primary flex-1"
+                onclick="loadBranchDetail()"
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <circle cx="11" cy="11" r="8" />
+                  <path d="m21 21-4.3-4.3" />
+                </svg>
+                ค้นหา
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
 
-        <!-- Step 1: Select Branch & Layer -->
-        <div class="card mb-6 fade-in">
-            <div class="card-header">
-                <h3>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-                    เลือกสาขาและชั้นข้อมูล
-                </h3>
-            </div>
-            <div class="card-body">
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
-                    <div>
-                        <label class="filter-label mb-1 block">เขต</label>
-                        <select id="detailZone" onchange="onDetailZoneChange()" class="w-full">
-                            <option value="">เลือกเขต</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="filter-label mb-1 block">สาขา</label>
-                        <select id="detailBranch" class="w-full">
-                            <option value="">เลือกสาขา</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="filter-label mb-1 block">ชั้นข้อมูล</label>
-                        <select id="detailLayer" class="w-full">
-                            <option value="">ทุกชั้นข้อมูล</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="filter-label mb-1 block">วันที่เริ่ม</label>
-                        <input type="text" id="detailStartDate" class="w-full" placeholder="เลือกวันที่" readonly>
-                    </div>
-                    <div>
-                        <label class="filter-label mb-1 block">วันที่สิ้นสุด</label>
-                        <input type="text" id="detailEndDate" class="w-full" placeholder="เลือกวันที่" readonly>
-                    </div>
-                    <div class="flex items-end gap-2">
-                        <button class="btn btn-primary flex-1" onclick="loadBranchDetail()">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-                            ค้นหา
-                        </button>
-                    </div>
-                </div>
-            </div>
+      <!-- Results Section -->
+      <div id="resultsSection" style="display: none">
+        <div
+          class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6"
+          id="detailStats"
+        ></div>
+
+        <!-- Map Section -->
+        <div id="detailMapContainer" class="card mb-6">
+          <div class="card-header">
+            <h3>
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                <circle cx="12" cy="10" r="3" />
+              </svg>
+              <span id="mapTitle">แผนที่ข้อมูล</span>
+            </h3>
+            <span
+              id="mapFeatureCount"
+              class="badge badge-gold"
+              style="font-size: 12px"
+              >0 features</span
+            >
+          </div>
+          <div style="position: relative">
+            <div id="detailMap"></div>
+          </div>
+          <div class="map-footer">
+            <div
+              id="mapLegend"
+              style="display: flex; flex-wrap: wrap; gap: 4px"
+            ></div>
+            <span>คลิกที่ feature เพื่อดู properties</span>
+          </div>
         </div>
 
-        <!-- Results Section -->
-        <div id="resultsSection" style="display:none;">
-            <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6" id="detailStats"></div>
-
-            <!-- Map Section -->
-            <div id="detailMapContainer" class="card mb-6">
-                <div class="card-header">
-                    <h3>
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                        <span id="mapTitle">แผนที่ข้อมูล</span>
-                    </h3>
-                    <span id="mapFeatureCount" class="badge badge-gold" style="font-size:12px;">0 features</span>
-                </div>
-                <div style="position:relative;">
-                    <div id="detailMap"></div>
-                </div>
-                <div class="map-footer">
-                    <div id="mapLegend" style="display:flex;flex-wrap:wrap;gap:4px;"></div>
-                    <span>คลิกที่ feature เพื่อดู properties</span>
-                </div>
-            </div>
-
-            <!-- Chart + Table -->
-            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-6">
-                <div class="lg:col-span-4">
-                    <div class="card">
-                        <div class="card-header"><h3>
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="15" x2="21" y2="15"/><polyline points="8 9 12 5 16 9"/></svg>
-                            สัดส่วนข้อมูล
-                        </h3></div>
-                        <div class="card-body">
-                            <div class="chart-container" style="max-width:300px;">
-                                <canvas id="detailPieChart"></canvas>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="lg:col-span-8">
-                    <div class="card">
-                        <div class="card-header"><h3>
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/></svg>
-                            จำนวนข้อมูลแยกตามชั้นข้อมูล
-                        </h3></div>
-                        <div class="card-body p-0">
-                            <table class="data-table" id="layerCountTable">
-                                <thead><tr>
-                                    <th>ชั้นข้อมูล</th><th>ชื่อภาษาไทย</th>
-                                    <th class="text-right">จำนวน</th><th class="text-right">สัดส่วน %</th>
-                                </tr></thead>
-                                <tbody id="layerCountBody"></tbody>
-                                <tfoot><tr class="total-row">
-                                    <td colspan="2"><strong>รวมทั้งหมด</strong></td>
-                                    <td class="num" id="layerTotal">0</td>
-                                    <td class="num">100%</td>
-                                </tr></tfoot>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Export Section -->
+        <!-- Chart + Table -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-6">
+          <div class="lg:col-span-4">
             <div class="card">
-                <div class="card-header"><h3>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                    Export ข้อมูล
-                </h3></div>
-                <div class="card-body">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div class="p-4 rounded-lg" style="background:var(--surface-2);border:1px solid var(--border);">
-                            <h4 class="text-sm font-semibold mb-3 flex items-center gap-2" style="color:var(--pwa-gold);">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
-                                Export ตารางสรุป (.xlsx)
-                            </h4>
-                            <p class="text-xs mb-4" style="color:var(--text-muted);">ส่งออกตารางสรุปจำนวนข้อมูลของสาขาที่เลือก ในรูปแบบ Excel</p>
-                            <button class="btn btn-gold" onclick="exportDetailExcel()">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                                Download Excel
-                            </button>
-                        </div>
-                        <div class="p-4 rounded-lg" style="background:var(--surface-2);border:1px solid var(--border);">
-                            <h4 class="text-sm font-semibold mb-3 flex items-center gap-2" style="color:var(--accent-cyan);">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                                Export ข้อมูลเชิงพื้นที่
-                            </h4>
-                            <p class="text-xs mb-3" style="color:var(--text-muted);">ส่งออกข้อมูลเชิงพื้นที่พร้อม properties รองรับ GeoJSON, GeoPackage, Shape File, FlatGeobuf, MBTiles</p>
-                            <div class="flex items-center gap-3 mb-4">
-                                <label class="filter-label">ชั้นข้อมูล</label>
-                                <select id="exportLayer" class="flex-1"><option value="">เลือกชั้นข้อมูล</option></select>
-                            </div>
-                            <div class="flex items-center gap-3 mb-4">
-                                <label class="filter-label">รูปแบบ</label>
-                                <select id="exportFormat">
-                                    <option value="geojson">GeoJSON (.geojson)</option>
-                                    <option value="gpkg">GeoPackage (.gpkg)</option>
-                                    <option value="shp">Shape File (.shp)</option>
-                                    <option value="fgb">FlatGeobuf (.fgb)</option>
-                                    <option value="mbtiles">MBTiles (.mbtiles)</option>
-                                </select>
-                            </div>
-                            <button class="btn btn-primary" onclick="exportGeoData()">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                                Download GeoData
-                            </button>
-                        </div>
-                    </div>
+              <div class="card-header">
+                <h3>
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                    <line x1="3" y1="15" x2="21" y2="15" />
+                    <polyline points="8 9 12 5 16 9" />
+                  </svg>
+                  สัดส่วนข้อมูล
+                </h3>
+              </div>
+              <div class="card-body">
+                <div class="chart-container" style="max-width: 300px">
+                  <canvas id="detailPieChart"></canvas>
                 </div>
+              </div>
             </div>
+          </div>
+          <div class="lg:col-span-8">
+            <div class="card">
+              <div class="card-header">
+                <h3>
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <ellipse cx="12" cy="5" rx="9" ry="3" />
+                    <path d="M3 5V19A9 3 0 0 0 21 19V5" />
+                    <path d="M3 12A9 3 0 0 0 21 12" />
+                  </svg>
+                  จำนวนข้อมูลแยกตามชั้นข้อมูล
+                </h3>
+              </div>
+              <div class="card-body p-0">
+                <table class="data-table" id="layerCountTable">
+                  <thead>
+                    <tr>
+                      <th>ชั้นข้อมูล</th>
+                      <th>ชื่อภาษาไทย</th>
+                      <th class="text-right">จำนวน</th>
+                      <th class="text-right">สัดส่วน %</th>
+                    </tr>
+                  </thead>
+                  <tbody id="layerCountBody"></tbody>
+                  <tfoot>
+                    <tr class="total-row">
+                      <td colspan="2"><strong>รวมทั้งหมด</strong></td>
+                      <td class="num" id="layerTotal">0</td>
+                      <td class="num">100%</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <!-- Initial State -->
-        <div id="emptyState" class="text-center py-20">
-            <div class="inline-flex items-center justify-center w-20 h-20 rounded-2xl mb-6" style="background:var(--surface-2);">
-                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color:var(--text-muted);"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        <!-- Export Section -->
+        <div class="card">
+          <div class="card-header">
+            <h3>
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+              Export ข้อมูล
+            </h3>
+          </div>
+          <div class="card-body">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div
+                class="p-4 rounded-lg"
+                style="
+                  background: var(--surface-2);
+                  border: 1px solid var(--border);
+                "
+              >
+                <h4
+                  class="text-sm font-semibold mb-3 flex items-center gap-2"
+                  style="color: var(--pwa-gold)"
+                >
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                    <line x1="3" y1="9" x2="21" y2="9" />
+                    <line x1="3" y1="15" x2="21" y2="15" />
+                    <line x1="9" y1="3" x2="9" y2="21" />
+                  </svg>
+                  Export ตารางสรุป (.xlsx)
+                </h4>
+                <p class="text-xs mb-4" style="color: var(--text-muted)">
+                  ส่งออกตารางสรุปจำนวนข้อมูลของสาขาที่เลือก ในรูปแบบ Excel
+                </p>
+                <button class="btn btn-gold" onclick="exportDetailExcel()">
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                  Download Excel
+                </button>
+              </div>
+              <div
+                class="p-4 rounded-lg"
+                style="
+                  background: var(--surface-2);
+                  border: 1px solid var(--border);
+                "
+              >
+                <h4
+                  class="text-sm font-semibold mb-3 flex items-center gap-2"
+                  style="color: var(--accent-cyan)"
+                >
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                    <circle cx="12" cy="10" r="3" />
+                  </svg>
+                  Export ข้อมูลเชิงพื้นที่
+                </h4>
+                <p class="text-xs mb-3" style="color: var(--text-muted)">
+                  ส่งออกข้อมูลเชิงพื้นที่พร้อม properties รองรับ GeoJSON,
+                  GeoPackage, Shape File, FlatGeobuf, MBTiles
+                </p>
+                <div class="flex items-center gap-3 mb-4">
+                  <label class="filter-label">ชั้นข้อมูล</label>
+                  <select id="exportLayer" class="flex-1">
+                    <option value="">เลือกชั้นข้อมูล</option>
+                  </select>
+                </div>
+                <div class="flex items-center gap-3 mb-4">
+                  <label class="filter-label">รูปแบบ</label>
+                  <select id="exportFormat">
+                    <option value="geojson">GeoJSON (.geojson)</option>
+                    <option value="gpkg">GeoPackage (.gpkg)</option>
+                    <option value="shp">Shape File (.shp)</option>
+                    <option value="fgb">FlatGeobuf (.fgb)</option>
+                    <option value="mbtiles">MBTiles (.mbtiles)</option>
+                  </select>
+                </div>
+                <button class="btn btn-primary" onclick="exportGeoData()">
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                  Download GeoData
+                </button>
+              </div>
             </div>
-            <h3 class="text-lg font-semibold mb-2" style="color:var(--text-secondary);">เลือกสาขาเพื่อดูข้อมูล</h3>
-            <p class="text-sm" style="color:var(--text-muted);">กรุณาเลือกเขตและสาขา จากนั้นกดปุ่ม "ค้นหา" เพื่อแสดงข้อมูลจำนวน features</p>
+          </div>
         </div>
+      </div>
+
+      <!-- Initial State -->
+      <div id="emptyState" class="text-center py-20">
+        <div
+          class="inline-flex items-center justify-center w-20 h-20 rounded-2xl mb-6"
+          style="background: var(--surface-2)"
+        >
+          <svg
+            width="40"
+            height="40"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+            style="color: var(--text-muted)"
+          >
+            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+            <circle cx="12" cy="10" r="3" />
+          </svg>
+        </div>
+        <h3
+          class="text-lg font-semibold mb-2"
+          style="color: var(--text-secondary)"
+        >
+          เลือกสาขาเพื่อดูข้อมูล
+        </h3>
+        <p class="text-sm" style="color: var(--text-muted)">
+          กรุณาเลือกเขตและสาขา จากนั้นกดปุ่ม "ค้นหา" เพื่อแสดงข้อมูลจำนวน
+          features
+        </p>
+      </div>
     </main>
 
-    <footer class="max-w-screen-2xl mx-auto px-4 py-6 text-center relative z-10">
-        <p class="text-xs" style="color:var(--text-muted);">PWA GIS Online Tracking Dashboard © 2025 — Provincial Waterworks Authority</p>
+    <footer
+      class="max-w-screen-2xl mx-auto px-4 py-6 text-center relative z-10"
+    >
+      <p class="text-xs" style="color: var(--text-muted)">
+        PWA GIS Online Tracking Dashboard © 2025 — Provincial Waterworks
+        Authority
+      </p>
     </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/th.js"></script>
     <script src="/pwa_gis_tracking/static/js/thai_custom_date.js"></script>
     <script src="/pwa_gis_tracking/static/js/detail.js"></script>
-</body>
+
+    <!-- Mobile Menu Toggle -->
+    <script>
+    function toggleMobileMenu() {
+        var nav = document.getElementById('navLinks');
+        var icon = document.getElementById('menuIcon');
+        nav.classList.toggle('show');
+        if (nav.classList.contains('show')) {
+            icon.classList.replace('fa-bars', 'fa-xmark');
+        } else {
+            icon.classList.replace('fa-xmark', 'fa-bars');
+        }
+    }
+    document.addEventListener('click', function(e) {
+        var nav = document.getElementById('navLinks');
+        var btn = document.querySelector('.mobile-menu-btn');
+        if (nav && btn && !nav.contains(e.target) && !btn.contains(e.target)) {
+            nav.classList.remove('show');
+            var icon = document.getElementById('menuIcon');
+            if (icon) icon.classList.replace('fa-xmark', 'fa-bars');
+        }
+    });
+    window.addEventListener('resize', function() {
+        if (window.innerWidth > 768) {
+            var nav = document.getElementById('navLinks');
+            if (nav) nav.classList.remove('show');
+        }
+    });
+    </script>
+  </body>
 </html>

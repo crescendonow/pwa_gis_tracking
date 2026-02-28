@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -44,6 +45,11 @@ func main() {
 
 	// Start background cache cleaner (removes expired entries every minute)
 	handlers.StartCacheCleaner()
+
+	// Background cache warmer every 15 minutes
+	ctx, cancel := context.WithCancel(context.Background())
+    defer cancel()
+    handlers.StartCacheWarmer(ctx)
 
 	// Register all routes
 	routes.RegisterRoutes(router)

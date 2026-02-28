@@ -60,6 +60,8 @@ func RegisterRoutes(router *gin.Engine) {
 			api.GET("/features/properties", handlers.GetFeatureProps)
 			api.GET("/cache/invalidate", handlers.InvalidateCache)
 			api.GET("/debug/collection", handlers.DebugCollection)
+			// Add API route for monitoring cache status
+			api.GET("/cache/status", handlers.GetCacheStatus)
 		}
 
 		// Health check

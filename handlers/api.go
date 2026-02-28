@@ -14,6 +14,16 @@ import (
 	"github.com/xuri/excelize/v2"
 )
 
+// GetCacheStatus returns cache monitoring info.
+// GET /api/cache/status
+func GetCacheStatus(c *gin.Context) {
+    stats := GetCacheStats()
+    c.JSON(http.StatusOK, gin.H{
+        "status": "success",
+        "cache":  stats,
+    })
+}
+
 // GetZones returns all zones with branch counts.
 // GET /api/zones
 func GetZones(c *gin.Context) {

@@ -13,6 +13,8 @@
     <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link rel="stylesheet" href="/pwa_gis_tracking/static/css/style.css">
+    <!-- Responsive style -->
+    <link rel="stylesheet" href="/pwa_gis_tracking/static/css/responsive.css">
     <style>
         /* Branch marker tooltip styling */
         .branch-tooltip {
@@ -58,7 +60,10 @@
                     <span>ระบบติดตามข้อมูล GIS ออนไลน์</span>
                 </div>
             </div>
-            <div class="flex items-center gap-2">
+                <button class="mobile-menu-btn" onclick="toggleMobileMenu()" aria-label="เมนู">
+                    <i class="fa-solid fa-bars" id="menuIcon"></i>
+                </button>
+            <div class="flex items-center gap-2" id="navLinks">
                 <a href="/pwa_gis_tracking/" class="nav-link active">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
                     ภาพรวม
@@ -257,5 +262,34 @@
 
     <script src="/pwa_gis_tracking/static/js/thai_custom_date.js"></script>
     <script src="/pwa_gis_tracking/static/js/dashboard.js"></script>
+
+    <!-- Mobile Menu Toggle -->
+    <script>
+    function toggleMobileMenu() {
+        var nav = document.getElementById('navLinks');
+        var icon = document.getElementById('menuIcon');
+        nav.classList.toggle('show');
+        if (nav.classList.contains('show')) {
+            icon.classList.replace('fa-bars', 'fa-xmark');
+        } else {
+            icon.classList.replace('fa-xmark', 'fa-bars');
+        }
+    }
+    document.addEventListener('click', function(e) {
+        var nav = document.getElementById('navLinks');
+        var btn = document.querySelector('.mobile-menu-btn');
+        if (nav && btn && !nav.contains(e.target) && !btn.contains(e.target)) {
+            nav.classList.remove('show');
+            var icon = document.getElementById('menuIcon');
+            if (icon) icon.classList.replace('fa-xmark', 'fa-bars');
+        }
+    });
+    window.addEventListener('resize', function() {
+        if (window.innerWidth > 768) {
+            var nav = document.getElementById('navLinks');
+            if (nav) nav.classList.remove('show');
+        }
+    });
+    </script>
 </body>
 </html>
