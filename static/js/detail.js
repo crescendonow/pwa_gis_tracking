@@ -451,26 +451,48 @@ async function loadMapForMultiBranch(pwaCodes, startDate, endDate) {
 /* ─── Render Multi-Branch Table ──────────────── */
 function renderMultiBranchTable(results) {
     // Use the stats area to show summary
+    var totalGrand = 0;
+    results.forEach(function (r) {
+        selectedLayers.forEach(function (l) { totalGrand += (r.layers[l] || 0); });
+    });
     document.getElementById('detailStats').innerHTML =
-        '<div class="stat-card" style="grid-column:span 2"><div class="stat-value" style="color:var(--pwa-gold)">' + results.length + '</div><div class="stat-label">สาขาที่เลือก</div></div>';
+        '<div class="stat-card"><div class="stat-value" style="color:var(--pwa-gold)">' + results.length + '</div><div class="stat-label">สาขาที่เลือก</div></div>' +
+        '<div class="stat-card"><div class="stat-value">' + formatNumber(totalGrand) + '</div><div class="stat-label">รวมทั้งหมด</div></div>';
 
-    // Build table
+    // Build per-layer totals
     var totalByLayer = {};
+    results.forEach(function (r) {
+        selectedLayers.forEach(function (l) {
+            totalByLayer[l] = (totalByLayer[l] || 0) + (r.layers[l] || 0);
+        });
+    });
+
+    // ── Table: Layer summary (with magnifying glass) ──
+    document.querySelector('#layerCountTable thead tr').innerHTML =
+        '<th>ชั้นข้อมูล</th><th>ชื่อภาษาไทย</th><th class="text-right">รวมทุกสาขา</th><th class="text-right">สัดส่วน %</th>';
     var tbody = document.getElementById('layerCountBody');
     tbody.innerHTML = '';
-    // Build a summary table showing each branch
-    var html = '';
-    results.forEach(function (r) {
-        var total = 0;
-        selectedLayers.forEach(function (l) { total += (r.layers[l] || 0); totalByLayer[l] = (totalByLayer[l] || 0) + (r.layers[l] || 0); });
-        html += '<tr><td>' + r.pwa_code + '</td><td>' + escapeHtml(r.name) + '</td><td class="num">' + formatNumber(total) + '</td><td class="num">เขต ' + r.zone + '</td></tr>';
+
+    allLayers.forEach(function (l) {
+        var count = totalByLayer[l.name] || 0;
+        var pct = totalGrand > 0 ? (count / totalGrand * 100).toFixed(1) : '0.0';
+        var clickable = count > 0;
+        var tr = document.createElement('tr');
+        if (clickable) {
+            tr.style.cursor = 'pointer';
+            tr.title = 'คลิกเพื่อดูข้อมูล ' + l.display_name;
+            tr.onclick = (function (name, displayName) {
+                return function () { openLayerModal(name, displayName); };
+            })(l.name, l.display_name);
+        }
+        tr.innerHTML = '<td>' + l.name +
+            (clickable ? ' <i class="fa-solid fa-magnifying-glass" style="font-size:10px;color:var(--pwa-gold)"></i>' : '') +
+            '</td><td>' + escapeHtml(l.display_name) + '</td>' +
+            '<td class="num">' + formatNumber(count) + '</td>' +
+            '<td class="num">' + pct + '%</td>';
+        tbody.appendChild(tr);
     });
-    tbody.innerHTML = html;
-    // Update table headers for multi-branch
-    document.querySelector('#layerCountTable thead tr').innerHTML = '<th>รหัสสาขา</th><th>ชื่อสาขา</th><th class="text-right">รวม</th><th class="text-right">เขต</th>';
-    var grandTotal = 0;
-    for (var k in totalByLayer) grandTotal += totalByLayer[k];
-    document.getElementById('layerTotal').textContent = formatNumber(grandTotal);
+    document.getElementById('layerTotal').textContent = formatNumber(totalGrand);
 
     // Chart: total by layer
     var labels = [], values = [], colors = [];
@@ -697,7 +719,7 @@ function addLayerToMap(map, layerName, sourceId, pwaCode) {
         var iconId = 'icon-' + layerName;
         var symbolId = layerName + '-point';
 
-        // Load SVG → render as symbol layer
+        // Load SVG → render as symbol layer (High DPI via loadSvgIcon)
         loadSvgIcon(map, iconId, cfg.icon, function () {
             if (map.getLayer(symbolId)) return;
             map.addLayer({
@@ -714,8 +736,9 @@ function addLayerToMap(map, layerName, sourceId, pwaCode) {
                         16, 0.8,
                         18, 1.0
                     ],
-                    'icon-allow-overlap': ['step', ['zoom'], false, 14, true],
-                    'icon-ignore-placement': false
+                    'icon-allow-overlap': ['step', ['zoom'], false, 15, true],
+                    'icon-ignore-placement': false,
+                    'icon-padding': 2
                 }
             });
             mapLoadedLayers.push(symbolId);
@@ -764,7 +787,8 @@ function addLayerToMap(map, layerName, sourceId, pwaCode) {
 
 /**
  * Load an SVG file as a MapLibre image for symbol layers.
- * SVG → Image → Canvas → ImageData → map.addImage()
+ * Renders at 2× resolution (96px) for crisp display on Retina/High-DPI screens.
+ * SVG → Image → Canvas(2x) → ImageData → map.addImage({ pixelRatio: 2 })
  */
 function loadSvgIcon(map, iconId, svgUrl, callback) {
     if (map.hasImage(iconId)) { callback(); return; }
@@ -772,15 +796,18 @@ function loadSvgIcon(map, iconId, svgUrl, callback) {
     var img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = function () {
-        var size = 48;
+        var displaySize = 48;
+        var renderSize = displaySize * 2; // 96px for High-DPI/Retina
         var canvas = document.createElement('canvas');
-        canvas.width = size;
-        canvas.height = size;
+        canvas.width = renderSize;
+        canvas.height = renderSize;
         var ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, size, size);
-        var imageData = ctx.getImageData(0, 0, size, size);
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, 0, 0, renderSize, renderSize);
+        var imageData = ctx.getImageData(0, 0, renderSize, renderSize);
         if (!map.hasImage(iconId)) {
-            map.addImage(iconId, { width: size, height: size, data: imageData.data });
+            map.addImage(iconId, { width: renderSize, height: renderSize, data: imageData.data }, { pixelRatio: 2 });
         }
         callback();
     };
@@ -902,9 +929,16 @@ function renderDetailTable(data) {
 
 function openLayerModal(layerName, displayName) {
     if (typeof LayerModal === 'undefined') return;
+    // For multi-branch: open modal for first branch that has data for this layer
     var pwaCode = selectedBranches[0] || '';
+    // Show which branch is being viewed when multiple are selected
+    var title = displayName;
+    if (selectedBranches.length > 1) {
+        var office = allOffices.find(function (o) { return o.pwa_code === pwaCode; });
+        title = displayName + ' — ' + (office ? office.name : pwaCode);
+    }
     LayerModal.open({
-        pwaCode: pwaCode, collection: layerName, layerDisplayName: displayName,
+        pwaCode: pwaCode, collection: layerName, layerDisplayName: title,
         startDate: document.getElementById('detailStartDate').value,
         endDate: document.getElementById('detailEndDate').value
     });

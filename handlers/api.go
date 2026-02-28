@@ -454,45 +454,61 @@ func DebugCollection(c *gin.Context) {
 
 // ExportGeoData exports features as GeoJSON (or other formats) for download.
 // GET /api/export/geodata?pwaCode=xxx&collection=xxx&format=geojson&startDate=xxx&endDate=xxx
-// Supported formats: geojson, gpkg, shp, fgb, mbtiles
+// Supports comma-separated pwaCode and collection for merge export:
+//   &merge=all     → รวมทุกสาขา+ชั้นข้อมูลเป็น 1 ไฟล์
+//   &merge=branch  → รวมสาขา แยกชั้นข้อมูล (collection ต้องเป็นค่าเดียว)
+//   &merge=layer   → แยกสาขา รวมชั้นข้อมูล (pwaCode ต้องเป็นค่าเดียว)
+// Supported formats: geojson, gpkg, shp, fgb, tab, pmtiles, mbtiles
 func ExportGeoData(c *gin.Context) {
-	pwaCode := c.Query("pwaCode")
-	collection := c.Query("collection")
+	pwaCodeParam := c.Query("pwaCode")
+	collectionParam := c.Query("collection")
 	startDate := c.Query("startDate")
 	endDate := c.Query("endDate")
 	format := c.DefaultQuery("format", "geojson")
+	mergeMode := c.Query("merge")
 
-	if pwaCode == "" || collection == "" {
+	if pwaCodeParam == "" || collectionParam == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "pwaCode and collection are required"})
 		return
 	}
 
-	// Validate collection name
+	// Parse comma-separated values
+	pwaCodes := splitAndTrim(pwaCodeParam)
+	collections := splitAndTrim(collectionParam)
+
+	// Validate all collection names
 	validLayers := services.GetAllLayerNames()
-	valid := false
+	validSet := make(map[string]bool)
 	for _, l := range validLayers {
-		if l == collection {
-			valid = true
-			break
+		validSet[l] = true
+	}
+	for _, col := range collections {
+		if !validSet[col] {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "Invalid collection: " + col + ". Valid: " + strings.Join(validLayers, ", "),
+			})
+			return
 		}
 	}
-	if !valid {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Invalid collection. Valid: " + strings.Join(validLayers, ", "),
-		})
+
+	// ─── Merged Export Mode ───────────────────────────────
+	if mergeMode != "" && (len(pwaCodes) > 1 || len(collections) > 1) {
+		exportMerged(c, pwaCodes, collections, format, startDate, endDate, mergeMode)
 		return
 	}
 
-	geojsonData, err := services.ExportFeaturesAsGeoJSON(pwaCode, collection, startDate, endDate)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
+	// ─── Single Export Mode (original logic) ─────────────
+	pwaCode := pwaCodes[0]
+	collection := collections[0]
 	filename := fmt.Sprintf("%s_%s", pwaCode, collection)
 
 	switch format {
 	case "geojson":
+		geojsonData, err := services.ExportFeaturesAsGeoJSON(pwaCode, collection, startDate, endDate)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
 		c.Header("Content-Type", "application/geo+json")
 		c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s.geojson", filename))
 		LogAuditEvent(c, "export_geojson", "export", fmt.Sprintf("%s:%s", pwaCode, collection))
@@ -553,7 +569,6 @@ func ExportGeoData(c *gin.Context) {
 		c.Data(http.StatusOK, "application/octet-stream", fgbData)
 
 	case "mbtiles":
-		// Same as PMTiles (MBTiles ต้องใช้ tippecanoe/ogr2ogr)
 		pmData, pmErr := services.ExportAsPMTiles(pwaCode, collection, startDate, endDate)
 		if pmErr != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "MBTiles export failed: " + pmErr.Error()})
@@ -564,6 +579,125 @@ func ExportGeoData(c *gin.Context) {
 		c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s.mbtiles", filename))
 		c.Data(http.StatusOK, "application/octet-stream", pmData)
 	}
+}
+
+// exportMerged handles merged export for multiple pwaCodes/collections.
+func exportMerged(c *gin.Context, pwaCodes, collections []string, format, startDate, endDate, mergeMode string) {
+	geojsonData, err := services.ExportMergedFeaturesAsGeoJSON(pwaCodes, collections, startDate, endDate)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Merge export failed: " + err.Error()})
+		return
+	}
+
+	outputName := "merged"
+	if len(pwaCodes) == 1 {
+		outputName = pwaCodes[0]
+	} else if len(pwaCodes) <= 3 {
+		outputName = strings.Join(pwaCodes, "_")
+	} else {
+		outputName = fmt.Sprintf("%s_etc_%d_branches", pwaCodes[0], len(pwaCodes))
+	}
+	if len(collections) == 1 {
+		outputName += "_" + collections[0]
+	} else {
+		outputName += "_multi"
+	}
+
+	auditDetail := fmt.Sprintf("merge_%s:pwa=[%s]:col=[%s]", mergeMode,
+		strings.Join(pwaCodes, ","), strings.Join(collections, ","))
+
+	switch format {
+	case "geojson":
+		c.Header("Content-Type", "application/geo+json")
+		c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s.geojson", outputName))
+		LogAuditEvent(c, "export_geojson_merged", "export", auditDetail)
+		c.Data(http.StatusOK, "application/geo+json", geojsonData)
+
+	case "gpkg":
+		data, convErr := services.ExportMergedAsGeoPackage(geojsonData, outputName)
+		if convErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "GPKG merge failed: " + convErr.Error()})
+			return
+		}
+		LogAuditEvent(c, "export_gpkg_merged", "export", auditDetail)
+		c.Header("Content-Type", "application/geopackage+sqlite3")
+		c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s.gpkg", outputName))
+		c.Data(http.StatusOK, "application/geopackage+sqlite3", data)
+
+	case "shp":
+		data, convErr := services.ExportMergedAsShapefile(geojsonData, outputName)
+		if convErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Shapefile merge failed: " + convErr.Error()})
+			return
+		}
+		LogAuditEvent(c, "export_shp_merged", "export", auditDetail)
+		c.Header("Content-Type", "application/zip")
+		c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s_shp.zip", outputName))
+		c.Data(http.StatusOK, "application/zip", data)
+
+	case "tab":
+		data, convErr := services.ExportMergedAsMapInfoTAB(geojsonData, outputName)
+		if convErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "TAB merge failed: " + convErr.Error()})
+			return
+		}
+		LogAuditEvent(c, "export_tab_merged", "export", auditDetail)
+		c.Header("Content-Type", "application/zip")
+		c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s_tab.zip", outputName))
+		c.Data(http.StatusOK, "application/zip", data)
+
+	case "fgb":
+		data, convErr := services.ExportMergedAsFlatGeobuf(geojsonData, outputName)
+		if convErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "FGB merge failed: " + convErr.Error()})
+			return
+		}
+		LogAuditEvent(c, "export_fgb_merged", "export", auditDetail)
+		c.Header("Content-Type", "application/octet-stream")
+		c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s.fgb", outputName))
+		c.Data(http.StatusOK, "application/octet-stream", data)
+
+	case "pmtiles":
+		data, convErr := services.ExportMergedAsPMTiles(geojsonData, outputName)
+		if convErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "PMTiles merge failed: " + convErr.Error()})
+			return
+		}
+		LogAuditEvent(c, "export_pmtiles_merged", "export", auditDetail)
+		c.Header("Content-Type", "application/octet-stream")
+		c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s.pmtiles", outputName))
+		c.Data(http.StatusOK, "application/octet-stream", data)
+
+	case "mbtiles":
+		data, convErr := services.ExportMergedAsPMTiles(geojsonData, outputName)
+		if convErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "MBTiles merge failed: " + convErr.Error()})
+			return
+		}
+		LogAuditEvent(c, "export_mbtiles_merged", "export", auditDetail)
+		c.Header("Content-Type", "application/octet-stream")
+		c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s.mbtiles", outputName))
+		c.Data(http.StatusOK, "application/octet-stream", data)
+
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{"error": "unsupported format for merge: " + format})
+	}
+}
+
+// splitAndTrim splits a comma-separated string and trims whitespace.
+func splitAndTrim(s string) []string {
+	if s == "" {
+		return nil
+	}
+	parts := strings.Split(s, ",")
+	var result []string
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			result = append(result, p)
+		}
+	}
+	return result
 }
 
 // GetFeaturesForMap returns lightweight GeoJSON for MapLibre map rendering.

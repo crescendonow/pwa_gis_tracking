@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"log"
 	"time"
@@ -629,4 +630,148 @@ func encodeProperties(props map[string]interface{}, columns []fgbColumn) []byte 
 	}
 
 	return buf.Bytes()
+}
+
+// ========================================================================
+// Merged Export: GeoJSON bytes → FlatGeobuf (Pure Go, no GDAL)
+// ========================================================================
+
+// geojsonFC is a minimal GeoJSON FeatureCollection for parsing.
+type geojsonFC struct {
+	Type     string        `json:"type"`
+	Features []geojsonFeat `json:"features"`
+}
+
+type geojsonFeat struct {
+	Type       string                 `json:"type"`
+	Geometry   geojsonGeom            `json:"geometry"`
+	Properties map[string]interface{} `json:"properties"`
+}
+
+type geojsonGeom struct {
+	Type        string      `json:"type"`
+	Coordinates interface{} `json:"coordinates"`
+}
+
+// ExportMergedAsFlatGeobuf converts pre-merged GeoJSON bytes to FlatGeobuf binary.
+// Uses the same pure-Go FGB writer as single export (no ogr2ogr needed).
+func ExportMergedAsFlatGeobuf(geojsonData []byte, outputName string) ([]byte, error) {
+	var fc geojsonFC
+	if err := json.Unmarshal(geojsonData, &fc); err != nil {
+		return nil, fmt.Errorf("parse GeoJSON failed: %w", err)
+	}
+	if len(fc.Features) == 0 {
+		return nil, fmt.Errorf("no features in merged GeoJSON")
+	}
+
+	// Convert GeoJSON features → fgbFeature list + discover columns
+	var features []fgbFeature
+	columnOrder := []string{}
+	columnSet := map[string]byte{}
+	var primaryGeomType byte = fgbGeomUnknown
+
+	for _, gf := range fc.Features {
+		if gf.Geometry.Type == "" {
+			continue
+		}
+
+		feat := fgbFeature{Props: make(map[string]interface{})}
+
+		// Re-encode geometry coordinates to bson.M for parseGeometry reuse
+		geomBson := bson.M{
+			"type":        gf.Geometry.Type,
+			"coordinates": convertCoords(gf.Geometry.Coordinates),
+		}
+		if err := parseGeometry(geomBson, &feat); err != nil {
+			continue
+		}
+
+		if primaryGeomType == fgbGeomUnknown {
+			primaryGeomType = feat.GeomType
+		}
+
+		// Parse properties
+		for k, v := range gf.Properties {
+			if v == nil {
+				continue
+			}
+			switch val := v.(type) {
+			case string:
+				feat.Props[k] = val
+				if _, exists := columnSet[k]; !exists {
+					columnSet[k] = fgbColString
+					columnOrder = append(columnOrder, k)
+				}
+			case float64:
+				// JSON numbers are always float64; detect ints
+				if val == float64(int64(val)) && val >= -2147483648 && val <= 2147483647 {
+					feat.Props[k] = int64(val)
+					if _, exists := columnSet[k]; !exists {
+						columnSet[k] = fgbColInt
+						columnOrder = append(columnOrder, k)
+					}
+				} else {
+					feat.Props[k] = val
+					if _, exists := columnSet[k]; !exists {
+						columnSet[k] = fgbColDouble
+						columnOrder = append(columnOrder, k)
+					}
+				}
+			case bool:
+				feat.Props[k] = val
+				if _, exists := columnSet[k]; !exists {
+					columnSet[k] = fgbColBool
+					columnOrder = append(columnOrder, k)
+				}
+			default:
+				feat.Props[k] = fmt.Sprintf("%v", v)
+				if _, exists := columnSet[k]; !exists {
+					columnSet[k] = fgbColString
+					columnOrder = append(columnOrder, k)
+				}
+			}
+		}
+
+		features = append(features, feat)
+	}
+
+	if len(features) == 0 {
+		return nil, fmt.Errorf("no valid features after parsing")
+	}
+
+	columns := make([]fgbColumn, len(columnOrder))
+	for i, name := range columnOrder {
+		columns[i] = fgbColumn{Name: name, Type: columnSet[name]}
+	}
+
+	log.Printf("[Export] FGB (merged, pure Go): %s → %d features", outputName, len(features))
+	return buildFlatGeobuf(features, columns, primaryGeomType, outputName)
+}
+
+// convertCoords recursively converts JSON-decoded coordinates ([]interface{})
+// to the types that parseGeometry expects (matching bson.M from MongoDB).
+// JSON arrays decode as []interface{} which is compatible with bson.A.
+func convertCoords(v interface{}) interface{} {
+	switch val := v.(type) {
+	case []interface{}:
+		// Check if this is a coordinate pair [lon, lat] (array of numbers)
+		if len(val) >= 2 {
+			if _, ok := val[0].(float64); ok {
+				// It's a coordinate — return as primitive.A for bson compatibility
+				a := primitive.A{}
+				for _, n := range val {
+					a = append(a, n)
+				}
+				return a
+			}
+		}
+		// It's a nested array — recurse
+		a := primitive.A{}
+		for _, item := range val {
+			a = append(a, convertCoords(item))
+		}
+		return a
+	default:
+		return v
+	}
 }

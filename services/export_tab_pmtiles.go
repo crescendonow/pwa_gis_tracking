@@ -29,22 +29,31 @@ import (
 // Returns a zip file containing .tab, .dat, .map, .id files.
 // Uses Go's archive/zip package (cross-platform, no external zip needed).
 func ExportAsMapInfoTAB(pwaCode, collection, startDate, endDate string) ([]byte, error) {
-	// 1. Check ogr2ogr availability
 	ogr2ogrPath, err := findOgr2ogr()
 	if err != nil {
 		return nil, err
 	}
-
-	// 2. Get GeoJSON data
 	geojsonData, err := ExportFeaturesAsGeoJSON(pwaCode, collection, startDate, endDate)
 	if err != nil {
 		return nil, fmt.Errorf("GeoJSON export failed: %w", err)
 	}
+	return convertGeoJSONToTAB(ogr2ogrPath, geojsonData, pwaCode, collection)
+}
+
+// ExportMergedAsMapInfoTAB converts pre-merged GeoJSON to MapInfo TAB.
+func ExportMergedAsMapInfoTAB(geojsonData []byte, outputName string) ([]byte, error) {
+	ogr2ogrPath, err := findOgr2ogr()
+	if err != nil {
+		return nil, err
+	}
+	return convertGeoJSONToTAB(ogr2ogrPath, geojsonData, outputName, "merged")
+}
+
+func convertGeoJSONToTAB(ogr2ogrPath string, geojsonData []byte, pwaCode, collection string) ([]byte, error) {
 	if len(geojsonData) < 50 {
 		return nil, fmt.Errorf("no features to export")
 	}
 
-	// 3. Create temp directory
 	tmpDir, err := os.MkdirTemp("", "pwa_tab_*")
 	if err != nil {
 		return nil, fmt.Errorf("temp dir error: %w", err)
@@ -56,7 +65,6 @@ func ExportAsMapInfoTAB(pwaCode, collection, startDate, endDate string) ([]byte,
 		return nil, fmt.Errorf("write input failed: %w", err)
 	}
 
-	// 4. Convert with ogr2ogr → MapInfo TAB
 	outDir := filepath.Join(tmpDir, "tab_out")
 	os.MkdirAll(outDir, 0755)
 	tabFilename := fmt.Sprintf("%s_%s.tab", pwaCode, collection)
@@ -75,7 +83,6 @@ func ExportAsMapInfoTAB(pwaCode, collection, startDate, endDate string) ([]byte,
 		return nil, fmt.Errorf("ogr2ogr TAB failed: %s — %w", string(output), err)
 	}
 
-	// 5. Zip with Go's archive/zip (cross-platform — no external zip command)
 	zipBuf, err := zipDirectory(outDir, []string{".tab", ".dat", ".map", ".id", ".ind"})
 	if err != nil {
 		return nil, fmt.Errorf("zip creation failed: %w", err)
@@ -88,16 +95,23 @@ func ExportAsMapInfoTAB(pwaCode, collection, startDate, endDate string) ([]byte,
 // ExportAsPMTiles converts GeoJSON to PMTiles vector tiles.
 // Priority: tippecanoe → ogr2ogr+GPKG+pmtiles → error with install hint.
 func ExportAsPMTiles(pwaCode, collection, startDate, endDate string) ([]byte, error) {
-	// 1. Get GeoJSON data
 	geojsonData, err := ExportFeaturesAsGeoJSON(pwaCode, collection, startDate, endDate)
 	if err != nil {
 		return nil, fmt.Errorf("GeoJSON export failed: %w", err)
 	}
+	return convertGeoJSONToPMTiles(geojsonData, pwaCode, collection)
+}
+
+// ExportMergedAsPMTiles converts pre-merged GeoJSON to PMTiles.
+func ExportMergedAsPMTiles(geojsonData []byte, outputName string) ([]byte, error) {
+	return convertGeoJSONToPMTiles(geojsonData, outputName, "merged")
+}
+
+func convertGeoJSONToPMTiles(geojsonData []byte, pwaCode, collection string) ([]byte, error) {
 	if len(geojsonData) < 50 {
 		return nil, fmt.Errorf("no features to export")
 	}
 
-	// 2. Create temp directory
 	tmpDir, err := os.MkdirTemp("", "pwa_pmtiles_*")
 	if err != nil {
 		return nil, fmt.Errorf("temp dir error: %w", err)
