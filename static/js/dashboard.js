@@ -568,15 +568,15 @@ function renderLayerChart(data) {
     });
 }
 
-/** Render the branch list (right sidebar), sorted by meter count descending. */
+/** Render the branch list (right sidebar), sorted by zone then pwa_code. */
 function renderBranchList(branches) {
     var tbody = document.getElementById('branchTableBody');
     document.getElementById('branchCountBadge').textContent = branches.length + ' สาขา';
 
     var sorted = branches.slice().sort(function(a, b) {
-        var mA = (a.layers || {}).meter || 0;
-        var mB = (b.layers || {}).meter || 0;
-        return mB - mA;
+        var za = parseInt(a.zone) || 0, zb = parseInt(b.zone) || 0;
+        if (za !== zb) return za - zb;
+        return (a.pwa_code || '').localeCompare(b.pwa_code || '');
     });
 
     tbody.innerHTML = sorted.map(function(b, i) {
@@ -667,7 +667,11 @@ function renderTablePage() {
             '<td><span class="badge badge-gold">' + b.zone + '</span></td>';
         layers.forEach(function(l, idx) {
             var val = (b.layers || {})[l] || 0;
-            r += '<td class="num ' + (val === 0 ? 'zero' : '') + '">' + formatNumber(val) + '</td>';
+            if (val > 0) {
+                r += '<td class="num" style="cursor:pointer;" onclick="openDashLayerModal(\'' + b.pwa_code + '\',\'' + l + '\')" title="คลิกดูข้อมูล ' + getLayerDisplayName(l) + '">' + formatNumber(val) + '</td>';
+            } else {
+                r += '<td class="num zero">' + formatNumber(val) + '</td>';
+            }
             if (idx === pipeIdx) {
                 var pl = b.pipe_long || 0;
                 r += '<td class="num ' + (pl === 0 ? 'zero' : '') + '" style="color:#E67E22;">' + formatDecimal(pl) + '</td>';
@@ -738,6 +742,31 @@ function filterTable() {
     var rows = document.querySelectorAll('#fullTableBody tr');
     rows.forEach(function(row) {
         row.style.display = row.textContent.toLowerCase().includes(search) ? '' : 'none';
+    });
+}
+
+/** Get layer display name from loaded layerNames. */
+function getLayerDisplayName(name) {
+    var ln = layerNames.find(function(l) { return l.name === name; });
+    return ln ? ln.display_name : name;
+}
+
+/** Open layer data modal from dashboard full table cell click. */
+function openDashLayerModal(pwaCode, layerName) {
+    if (typeof LayerModal === 'undefined') {
+        console.warn('LayerModal not loaded');
+        return;
+    }
+
+    var startDate = document.getElementById('filterStartDate').value;
+    var endDate = document.getElementById('filterEndDate').value;
+
+    LayerModal.open({
+        pwaCode: pwaCode,
+        collection: layerName,
+        layerDisplayName: getLayerDisplayName(layerName),
+        startDate: startDate,
+        endDate: endDate
     });
 }
 

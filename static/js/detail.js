@@ -216,14 +216,18 @@ function ensureMap() {
 /** Remove all feature layers and sources from the map. */
 function clearMapFeatures() {
     if (!detailMap) return;
+    // Remove layers first
     mapLoadedLayers.forEach(function(id) {
         if (detailMap.getLayer(id)) detailMap.removeLayer(id);
     });
+    // Remove sources — source ID = "src-" + layerName (strip suffix to get layerName)
+    var removedSources = {};
     mapLoadedLayers.forEach(function(id) {
-        // Source ID = layer ID minus suffix
-        var srcId = id.replace(/-point$|-line$|-fill$|-outline$/, '');
-        if (detailMap.getSource(srcId)) {
+        var layerName = id.replace(/-point$|-line$|-fill$|-outline$/, '');
+        var srcId = 'src-' + layerName;
+        if (!removedSources[srcId] && detailMap.getSource(srcId)) {
             try { detailMap.removeSource(srcId); } catch(e) {}
+            removedSources[srcId] = true;
         }
     });
     mapLoadedLayers = [];
@@ -708,6 +712,7 @@ function renderDetailTable(data) {
     var tbody = document.getElementById('layerCountBody');
     var layers = data.layers || {};
     var total = data.total || 0;
+    var pwaCode = data.pwa_code || document.getElementById('detailBranch').value;
 
     document.getElementById('layerTotal').textContent = formatNumber(total);
 
@@ -718,12 +723,41 @@ function renderDetailTable(data) {
         var displayName = ln ? ln.display_name : e[0];
         var pct = total > 0 ? ((e[1] / total) * 100).toFixed(1) : '0.0';
         var cls = e[1] === 0 ? 'zero' : '';
+        var clickAttr = '';
+        if (e[1] > 0) {
+            clickAttr = ' style="cursor:pointer;" title="คลิกเพื่อดูรายละเอียด ' + displayName + '"' +
+                ' onclick="openLayerModal(\'' + e[0] + '\',\'' + escapeHtml(displayName) + '\')"';
+        }
 
-        return '<tr><td><span class="badge badge-blue">' + e[0] + '</span></td>' +
-            '<td>' + displayName + '</td>' +
+        return '<tr' + clickAttr + '>' +
+            '<td><span class="badge badge-blue">' + e[0] + '</span></td>' +
+            '<td>' + displayName + (e[1] > 0 ? ' <span style="font-size:10px;color:var(--pwa-gold);">🔍</span>' : '') + '</td>' +
             '<td class="num ' + cls + '">' + formatNumber(e[1]) + '</td>' +
-            '<td class="num">' + pct + '%</td></tr>';
+            '<td class="num">' + pct + '%</td>' +
+            '</tr>';
     }).join('');
+}
+
+/** Open layer data modal from detail page layer count table click. */
+function openLayerModal(layerName, displayName) {
+    var pwaCode = document.getElementById('detailBranch').value;
+    if (!pwaCode) return;
+
+    if (typeof LayerModal === 'undefined') {
+        console.warn('LayerModal not loaded');
+        return;
+    }
+
+    var startDate = document.getElementById('detailStartDate').value;
+    var endDate = document.getElementById('detailEndDate').value;
+
+    LayerModal.open({
+        pwaCode: pwaCode,
+        collection: layerName,
+        layerDisplayName: displayName || layerName,
+        startDate: startDate,
+        endDate: endDate
+    });
 }
 
 // ==========================================

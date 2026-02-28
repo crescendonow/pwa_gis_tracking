@@ -497,6 +497,26 @@ func ExportGeoData(c *gin.Context) {
 		c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s.geojson", filename))
 		c.Data(http.StatusOK, "application/geo+json", geojsonData)
 
+	case "tab":
+		tabData, tabErr := services.ExportAsMapInfoTAB(pwaCode, collection, startDate, endDate)
+		if tabErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "TAB export failed: " + tabErr.Error()})
+			return
+		}
+		c.Header("Content-Type", "application/zip")
+		c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s_tab.zip", filename))
+		c.Data(http.StatusOK, "application/zip", tabData)
+
+	case "pmtiles":
+		pmData, pmErr := services.ExportAsPMTiles(pwaCode, collection, startDate, endDate)
+		if pmErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "PMTiles export failed: " + pmErr.Error()})
+			return
+		}
+		c.Header("Content-Type", "application/octet-stream")
+		c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s.pmtiles", filename))
+		c.Data(http.StatusOK, "application/octet-stream", pmData)
+
 	case "gpkg":
 		// TODO: Implement with go-sqlite3 + GeoPackage SQL spec
 		// For now, export as GeoJSON with note

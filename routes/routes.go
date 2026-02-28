@@ -62,6 +62,8 @@ func RegisterRoutes(router *gin.Engine) {
 			api.GET("/debug/collection", handlers.DebugCollection)
 			// Add API route for monitoring cache status
 			api.GET("/cache/status", handlers.GetCacheStatus)
+			api.GET("/features/list", handlers.GetFeaturesList)
+			api.GET("/field-mapping", handlers.GetFieldMapping)
 		}
 
 		// Health check

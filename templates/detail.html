@@ -18,7 +18,7 @@
     />
     <script src="https://unpkg.com/maplibre-gl@4.5.0/dist/maplibre-gl.js"></script>
     <link rel="stylesheet" href="/pwa_gis_tracking/static/css/style.css" />
-    <!-- FontAwesome (needed for hamburger icon + logout) -->
+    <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <!-- Responsive style -->
     <link rel="stylesheet" href="/pwa_gis_tracking/static/css/responsive.css" />
@@ -477,7 +477,7 @@
                 </h4>
                 <p class="text-xs mb-3" style="color: var(--text-muted)">
                   ส่งออกข้อมูลเชิงพื้นที่พร้อม properties รองรับ GeoJSON,
-                  GeoPackage, Shape File, FlatGeobuf, MBTiles
+                  MapInfo TAB, PMTiles, FlatGeobuf, GeoPackage, Shape File, MBTiles
                 </p>
                 <div class="flex items-center gap-3 mb-4">
                   <label class="filter-label">ชั้นข้อมูล</label>
@@ -489,9 +489,11 @@
                   <label class="filter-label">รูปแบบ</label>
                   <select id="exportFormat">
                     <option value="geojson">GeoJSON (.geojson)</option>
+                    <option value="tab">MapInfo TAB (.tab)</option>
+                    <option value="pmtiles">PMTiles (.pmtiles)</option>
+                    <option value="fgb">FlatGeobuf (.fgb)</option>
                     <option value="gpkg">GeoPackage (.gpkg)</option>
                     <option value="shp">Shape File (.shp)</option>
-                    <option value="fgb">FlatGeobuf (.fgb)</option>
                     <option value="mbtiles">MBTiles (.mbtiles)</option>
                   </select>
                 </div>
@@ -560,6 +562,7 @@
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/th.js"></script>
     <script src="/pwa_gis_tracking/static/js/thai_custom_date.js"></script>
+    <script src="/pwa_gis_tracking/static/js/layer_modal.js"></script>
     <script src="/pwa_gis_tracking/static/js/detail.js"></script>
 
     <!-- Mobile Menu Toggle -->
