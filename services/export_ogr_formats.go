@@ -11,15 +11,24 @@ import (
 // ExportAsGeoPackage converts GeoJSON to GeoPackage (.gpkg) using ogr2ogr.
 // Returns the raw .gpkg file bytes.
 func ExportAsGeoPackage(pwaCode, collection, startDate, endDate string) ([]byte, error) {
+	geojsonData, err := ExportFeaturesAsGeoJSON(pwaCode, collection, startDate, endDate)
+	if err != nil {
+		return nil, fmt.Errorf("GeoJSON export failed: %w", err)
+	}
+	return convertGeoJSONToGPKG(geojsonData, pwaCode, collection)
+}
+
+// ExportMergedAsGeoPackage converts pre-merged GeoJSON to GeoPackage.
+func ExportMergedAsGeoPackage(geojsonData []byte, outputName string) ([]byte, error) {
+	return convertGeoJSONToGPKG(geojsonData, outputName, "merged")
+}
+
+func convertGeoJSONToGPKG(geojsonData []byte, pwaCode, collection string) ([]byte, error) {
 	ogr2ogrPath, err := findOgr2ogr()
 	if err != nil {
 		return nil, err
 	}
 
-	geojsonData, err := ExportFeaturesAsGeoJSON(pwaCode, collection, startDate, endDate)
-	if err != nil {
-		return nil, fmt.Errorf("GeoJSON export failed: %w", err)
-	}
 	if len(geojsonData) < 50 {
 		return nil, fmt.Errorf("no features to export")
 	}
@@ -61,15 +70,24 @@ func ExportAsGeoPackage(pwaCode, collection, startDate, endDate string) ([]byte,
 // ExportAsShapefile converts GeoJSON to ESRI Shapefile using ogr2ogr.
 // Returns a zip containing .shp, .shx, .dbf, .prj files.
 func ExportAsShapefile(pwaCode, collection, startDate, endDate string) ([]byte, error) {
+	geojsonData, err := ExportFeaturesAsGeoJSON(pwaCode, collection, startDate, endDate)
+	if err != nil {
+		return nil, fmt.Errorf("GeoJSON export failed: %w", err)
+	}
+	return convertGeoJSONToShapefile(geojsonData, pwaCode, collection)
+}
+
+// ExportMergedAsShapefile converts pre-merged GeoJSON to Shapefile.
+func ExportMergedAsShapefile(geojsonData []byte, outputName string) ([]byte, error) {
+	return convertGeoJSONToShapefile(geojsonData, outputName, "merged")
+}
+
+func convertGeoJSONToShapefile(geojsonData []byte, pwaCode, collection string) ([]byte, error) {
 	ogr2ogrPath, err := findOgr2ogr()
 	if err != nil {
 		return nil, err
 	}
 
-	geojsonData, err := ExportFeaturesAsGeoJSON(pwaCode, collection, startDate, endDate)
-	if err != nil {
-		return nil, fmt.Errorf("GeoJSON export failed: %w", err)
-	}
 	if len(geojsonData) < 50 {
 		return nil, fmt.Errorf("no features to export")
 	}

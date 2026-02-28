@@ -367,11 +367,85 @@ async function loadMultiBranchSummary() {
         // Display multi-branch summary
         document.getElementById('resultsSection').style.display = 'block';
         document.getElementById('emptyState').style.display = 'none';
-        document.getElementById('detailMapContainer').style.display = 'none';
         renderMultiBranchTable(results);
         populateExportLayers();
+
+        // Load map for ALL selected branches
+        await loadMapForMultiBranch(selectedBranches, startDate, endDate);
     } catch (e) { console.error('Multi-branch error:', e); }
     hideLoading();
+}
+
+/* ─── Load Map for Multiple Branches ─────────── */
+async function loadMapForMultiBranch(pwaCodes, startDate, endDate) {
+    var container = document.getElementById('detailMapContainer');
+    container.style.display = 'block';
+    var map = ensureMap();
+    if (!map) return;
+    if (!map.loaded()) await new Promise(function (r) { map.on('load', r); });
+    clearMapFeatures();
+    document.getElementById('mapTitle').textContent = 'แผนที่: ' + pwaCodes.length + ' สาขา';
+    var bounds = new maplibregl.LngLatBounds();
+    var totalFeatures = 0;
+    var layerPanelHtml = '';
+    var layerFeatureCounts = {}; // track total features per layer across all branches
+
+    for (var li = 0; li < selectedLayers.length; li++) {
+        var layerName = selectedLayers[li];
+        var displayName = getLayerDisplayName(layerName);
+
+        // Merge GeoJSON features from all branches for this layer
+        var mergedFeatures = [];
+        var branchPwaForClick = {}; // map featureId → pwaCode for popup
+
+        for (var bi = 0; bi < pwaCodes.length; bi++) {
+            var pwa = pwaCodes[bi];
+            showLoading('โหลดแผนที่ ' + displayName + ' — ' + pwa + ' (' + (bi + 1) + '/' + pwaCodes.length + ')...');
+            try {
+                var url = '/pwa_gis_tracking/api/features/map?pwaCode=' + pwa + '&collection=' + layerName;
+                if (startDate) url += '&startDate=' + startDate;
+                if (endDate) url += '&endDate=' + endDate;
+                var res = await fetch(url);
+                if (!res.ok) continue;
+                var geojson = await res.json();
+                if (!geojson.features || !geojson.features.length) continue;
+
+                // Tag each feature with its pwaCode for click-handler
+                geojson.features.forEach(function (f) {
+                    if (f.properties) f.properties._pwaCode = pwa;
+                    mergedFeatures.push(f);
+                });
+            } catch (e) { console.error('Load map ' + layerName + '/' + pwa + ':', e); }
+        }
+
+        if (mergedFeatures.length === 0) continue;
+
+        var mergedGeoJSON = { type: 'FeatureCollection', features: mergedFeatures };
+        var sourceId = 'src-' + layerName;
+        map.addSource(sourceId, {
+            type: 'geojson', data: mergedGeoJSON,
+            tolerance: (layerName === 'pipe' || layerName === 'pipe_serv') ? 0.5 : 0.375,
+            buffer: 64
+        });
+        mapLoadedSources.push(sourceId);
+        // Pass null pwaCode — click handler will read _pwaCode from feature properties
+        addLayerToMap(map, layerName, sourceId, null);
+        mergedFeatures.forEach(function (f) {
+            if (f.geometry && f.geometry.coordinates) extendBounds(bounds, f.geometry.type, f.geometry.coordinates);
+        });
+        totalFeatures += mergedFeatures.length;
+
+        var cfg = LAYER_MAP_CONFIG[layerName] || { color: '#888' };
+        layerPanelHtml += '<label class="map-layer-toggle"><input type="checkbox" checked onchange="toggleMapLayer(this,\'' + layerName + '\')" />' +
+            '<span class="ldot" style="background:' + cfg.color + '"></span>' + escapeHtml(displayName) + ' (' + mergedFeatures.length + ')</label>';
+    }
+
+    document.getElementById('mapFeatureCount').textContent = formatNumber(totalFeatures) + ' features';
+    document.getElementById('mapLayerPanel').innerHTML = '<div style="font-size:11px;font-weight:600;color:var(--pwa-gold);padding:4px 6px;margin-bottom:4px">ชั้นข้อมูล</div>' + layerPanelHtml;
+    document.getElementById('mapLayerPanel').style.display = layerPanelHtml ? 'block' : 'none';
+
+    if (totalFeatures > 0) map.fitBounds(bounds, { padding: 50, maxZoom: 16, duration: 800 });
+    map._pwaQuery = { pwaCode: null, collection: null, multi: true };
 }
 
 /* ─── Render Multi-Branch Table ──────────────── */
@@ -590,7 +664,9 @@ function addLayerToMap(map, layerName, sourceId, pwaCode) {
             source: sourceId,
             paint: {
                 'line-color': cfg.color,
-                'line-width': 2.5,
+                'line-width': ['interpolate', ['linear'], ['zoom'],
+                    8, 1, 12, 2, 16, 3.5
+                ],
                 'line-opacity': 0.8
             }
         });
@@ -605,13 +681,13 @@ function addLayerToMap(map, layerName, sourceId, pwaCode) {
             id: fillId,
             type: 'fill',
             source: sourceId,
-            paint: { 'fill-color': cfg.color, 'fill-opacity': 0.2 }
+            paint: { 'fill-color': cfg.color, 'fill-opacity': ['interpolate', ['linear'], ['zoom'], 8, 0.05, 13, 0.15, 16, 0.25] }
         });
         map.addLayer({
             id: outlineId,
             type: 'line',
             source: sourceId,
-            paint: { 'line-color': cfg.color, 'line-width': 1 }
+            paint: { 'line-color': cfg.color, 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 0.5, 13, 1, 16, 2] }
         });
         mapLoadedLayers.push(fillId, outlineId);
         bindClickHandler(map, fillId, pwaCode, layerName);
@@ -631,8 +707,14 @@ function addLayerToMap(map, layerName, sourceId, pwaCode) {
                 filter: ['==', '$type', 'Point'],
                 layout: {
                     'icon-image': iconId,
-                    'icon-size': 0.55,
-                    'icon-allow-overlap': true,
+                    'icon-size': ['interpolate', ['linear'], ['zoom'],
+                        6, 0.15,
+                        10, 0.35,
+                        13, 0.55,
+                        16, 0.8,
+                        18, 1.0
+                    ],
+                    'icon-allow-overlap': ['step', ['zoom'], false, 14, true],
                     'icon-ignore-placement': false
                 }
             });
@@ -648,7 +730,9 @@ function addLayerToMap(map, layerName, sourceId, pwaCode) {
             source: sourceId,
             filter: ['==', '$type', 'Point'],
             paint: {
-                'circle-radius': 3,
+                'circle-radius': ['interpolate', ['linear'], ['zoom'],
+                    6, 1, 10, 2, 14, 3, 18, 5
+                ],
                 'circle-color': cfg.color,
                 'circle-opacity': 0.3,
                 'circle-stroke-width': 0
@@ -665,7 +749,9 @@ function addLayerToMap(map, layerName, sourceId, pwaCode) {
             source: sourceId,
             filter: ['==', '$type', 'Point'],
             paint: {
-                'circle-radius': 5,
+                'circle-radius': ['interpolate', ['linear'], ['zoom'],
+                    6, 2, 10, 3, 13, 5, 16, 8, 18, 12
+                ],
                 'circle-color': cfg.color,
                 'circle-stroke-width': 1,
                 'circle-stroke-color': 'rgba(255,255,255,0.5)'
@@ -719,11 +805,19 @@ function bindClickHandler(map, layerId, pwaCode, layerName) {
         if (!feat) return;
         var fid = feat.id || (feat.properties && feat.properties._fid) || '';
         if (!fid) return;
+        // Multi-branch: read pwaCode from feature properties; fallback to passed pwaCode
+        var effectivePwa = (feat.properties && feat.properties._pwaCode) || pwaCode || '';
+        if (!effectivePwa) return;
         var coords = e.lngLat;
-        var popupHtml = '<div class="popup-header">' + escapeHtml(getLayerDisplayName(layerName)) + '</div><div class="popup-body"><div class="popup-loading"><div class="spinner-sm"></div><br>กำลังโหลด...</div></div>';
+        var branchLabel = effectivePwa;
+        var office = allOffices.find(function (o) { return o.pwa_code === effectivePwa; });
+        if (office) branchLabel = effectivePwa + ' — ' + office.name;
+        var popupHtml = '<div class="popup-header">' + escapeHtml(getLayerDisplayName(layerName)) +
+            '<span style="font-weight:normal;font-size:11px;color:var(--text-muted);margin-left:8px">' + escapeHtml(branchLabel) + '</span>' +
+            '</div><div class="popup-body"><div class="popup-loading"><div class="spinner-sm"></div><br>กำลังโหลด...</div></div>';
         if (mapPopup) mapPopup.remove();
         mapPopup = new maplibregl.Popup({ maxWidth: '380px' }).setLngLat(coords).setHTML(popupHtml).addTo(map);
-        fetch('/pwa_gis_tracking/api/features/properties?pwaCode=' + pwaCode + '&collection=' + layerName + '&featureId=' + fid)
+        fetch('/pwa_gis_tracking/api/features/properties?pwaCode=' + effectivePwa + '&collection=' + layerName + '&featureId=' + fid)
             .then(function (r) { return r.json(); }).then(function (data) {
                 var props = data.properties || {};
                 var rows = Object.entries(props).filter(function (e) { return typeof e[1] !== 'object'; })
@@ -744,7 +838,11 @@ function renderDetailStats(data) {
     var total = 0; for (var k in layers) total += layers[k];
     var pwaCode = selectedBranches[0] || '';
     var office = allOffices.find(function (o) { return o.pwa_code === pwaCode; });
-    var html = '<div class="stat-card"><div class="stat-value" style="color:var(--pwa-gold)">' + (office ? escapeHtml(office.name) : pwaCode) + '</div><div class="stat-label">สาขา ' + pwaCode + '</div></div>' +
+    var officeName = office ? escapeHtml(office.name) : pwaCode;
+    // Auto-size: use smaller font for long branch names to keep consistent look
+    var nameStyle = 'color:var(--pwa-gold)';
+    if (officeName.length > 15) nameStyle += ';font-size:clamp(14px, 2vw, 20px)';
+    var html = '<div class="stat-card"><div class="stat-value" style="' + nameStyle + '">' + officeName + '</div><div class="stat-label">สาขา ' + pwaCode + '</div></div>' +
         '<div class="stat-card"><div class="stat-value">' + formatNumber(total) + '</div><div class="stat-label">รวมทั้งหมด</div></div>';
     var count = 0;
     for (var k in layers) { if (layers[k] > 0) count++; }
@@ -836,7 +934,7 @@ function populateExportLayers() {
     });
 }
 
-function addAllExportLayers() { populateExportLayers(); }
+function addAllExportLayers() { populateExportLayers(); updateMergeModeOptions(); }
 
 function exportGeoData() {
     if (selectedBranches.length === 0) { showToast('กรุณาเลือกสาขา', 'error'); return; }
@@ -848,23 +946,88 @@ function exportGeoData() {
     var startDate = document.getElementById('detailStartDate').value;
     var endDate = document.getElementById('detailEndDate').value;
 
-    // Export each branch+layer combo
-    var total = selectedBranches.length * layers.length;
-    showToast('กำลัง export ' + total + ' ไฟล์...', 'info');
+    // Check merge mode
+    var mergeEl = document.getElementById('exportMergeMode');
+    var mergeMode = mergeEl ? mergeEl.value : 'split';
 
-    selectedBranches.forEach(function (pwa) {
+    if (mergeMode === 'merge_all' && (selectedBranches.length > 1 || layers.length > 1)) {
+        // Merge all branches + all layers → single file
+        var pwaCodes = selectedBranches.join(',');
+        var layerNames = layers.join(',');
+        showToast('กำลัง export (รวมทุกสาขา+ทุกชั้นข้อมูล) 1 ไฟล์...', 'info');
+        var url = '/pwa_gis_tracking/api/export/geodata?pwaCode=' + pwaCodes + '&collection=' + layerNames + '&format=' + format + '&merge=all';
+        if (startDate) url += '&startDate=' + startDate;
+        if (endDate) url += '&endDate=' + endDate;
+        var iframe = document.createElement('iframe');
+        iframe.style.display = 'none';
+        iframe.src = url;
+        document.body.appendChild(iframe);
+        setTimeout(function () { iframe.remove(); }, 60000);
+
+    } else if (mergeMode === 'merge_branch' && selectedBranches.length > 1) {
+        // Merge all branches per layer → one file per layer
+        var total = layers.length;
+        showToast('กำลัง export (รวมสาขาแยกชั้นข้อมูล) ' + total + ' ไฟล์...', 'info');
+        var pwaCodes = selectedBranches.join(',');
         layers.forEach(function (layer) {
-            var url = '/pwa_gis_tracking/api/export/geodata?pwaCode=' + pwa + '&collection=' + layer + '&format=' + format;
+            var url = '/pwa_gis_tracking/api/export/geodata?pwaCode=' + pwaCodes + '&collection=' + layer + '&format=' + format + '&merge=branch';
             if (startDate) url += '&startDate=' + startDate;
             if (endDate) url += '&endDate=' + endDate;
-            // Use hidden iframe for multi-download
             var iframe = document.createElement('iframe');
             iframe.style.display = 'none';
             iframe.src = url;
             document.body.appendChild(iframe);
-            setTimeout(function () { iframe.remove(); }, 30000);
+            setTimeout(function () { iframe.remove(); }, 60000);
         });
-    });
+
+    } else if (mergeMode === 'merge_layer' && layers.length > 1) {
+        // Merge all layers per branch → one file per branch
+        var total = selectedBranches.length;
+        showToast('กำลัง export (แยกสาขา รวมชั้นข้อมูล) ' + total + ' ไฟล์...', 'info');
+        var layerNames = layers.join(',');
+        selectedBranches.forEach(function (pwa) {
+            var url = '/pwa_gis_tracking/api/export/geodata?pwaCode=' + pwa + '&collection=' + layerNames + '&format=' + format + '&merge=layer';
+            if (startDate) url += '&startDate=' + startDate;
+            if (endDate) url += '&endDate=' + endDate;
+            var iframe = document.createElement('iframe');
+            iframe.style.display = 'none';
+            iframe.src = url;
+            document.body.appendChild(iframe);
+            setTimeout(function () { iframe.remove(); }, 60000);
+        });
+
+    } else {
+        // Split mode: export each branch+layer combo separately
+        var total = selectedBranches.length * layers.length;
+        showToast('กำลัง export ' + total + ' ไฟล์ (แยกรายสาขา×ชั้นข้อมูล)...', 'info');
+
+        selectedBranches.forEach(function (pwa) {
+            layers.forEach(function (layer) {
+                var url = '/pwa_gis_tracking/api/export/geodata?pwaCode=' + pwa + '&collection=' + layer + '&format=' + format;
+                if (startDate) url += '&startDate=' + startDate;
+                if (endDate) url += '&endDate=' + endDate;
+                // Use hidden iframe for multi-download
+                var iframe = document.createElement('iframe');
+                iframe.style.display = 'none';
+                iframe.src = url;
+                document.body.appendChild(iframe);
+                setTimeout(function () { iframe.remove(); }, 30000);
+            });
+        });
+    }
+}
+
+function updateMergeModeOptions() {
+    var mergeEl = document.getElementById('exportMergeMode');
+    if (!mergeEl) return;
+    var hasManyBranches = selectedBranches.length > 1;
+    var exportItems = document.querySelectorAll('#exportLayerList .export-layer-item');
+    var hasManyLayers = exportItems.length > 1;
+    // Show/hide merge selector
+    var container = document.getElementById('exportMergeContainer');
+    if (container) {
+        container.style.display = (hasManyBranches || hasManyLayers) ? 'flex' : 'none';
+    }
 }
 
 function exportDetailExcel() {

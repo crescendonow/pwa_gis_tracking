@@ -350,6 +350,12 @@
         align-items: center;
         justify-content: space-between;
       }
+
+      /* Auto-size stat-value for long branch names */
+      .stat-value {
+        word-break: break-word;
+        line-height: 1.3;
+      }
     </style>
   </head>
   <body>
@@ -692,6 +698,16 @@
                     <option value="fgb">FlatGeobuf (.fgb)</option>
                     <option value="tab">MapInfo TAB (.tab)</option>
                     <option value="pmtiles">PMTiles (.pmtiles)</option>
+                  </select>
+                </div>
+                <!-- Merge/Split mode (visible when multi-branch or multi-layer) -->
+                <div id="exportMergeContainer" class="flex items-center gap-3 mb-4" style="display:none">
+                  <label class="filter-label"><i class="fa-solid fa-code-merge"></i> รวม/แยก</label>
+                  <select id="exportMergeMode" class="flex-1">
+                    <option value="split">แยกรายสาขา × ชั้นข้อมูล (ไฟล์แยก)</option>
+                    <option value="merge_branch">รวมสาขา — แยกชั้นข้อมูล</option>
+                    <option value="merge_layer">แยกสาขา — รวมชั้นข้อมูล</option>
+                    <option value="merge_all">รวมทั้งหมดเป็น 1 ไฟล์</option>
                   </select>
                 </div>
                 <button class="btn btn-primary" onclick="exportGeoData()">

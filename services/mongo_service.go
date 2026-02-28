@@ -586,3 +586,112 @@ func GetLayerDisplayName(layer string) string {
 	}
 	return strings.Title(layer)
 }
+
+// ExportMergedFeaturesAsGeoJSON exports features from multiple pwaCode+layer combinations
+// into a single merged GeoJSON FeatureCollection. Each feature is tagged with
+// _pwaCode and _layerName in properties for identification.
+func ExportMergedFeaturesAsGeoJSON(pwaCodes []string, layerNames []string, startDate, endDate string) ([]byte, error) {
+	type Feature struct {
+		Type       string                 `json:"type"`
+		Geometry   interface{}            `json:"geometry"`
+		Properties map[string]interface{} `json:"properties"`
+	}
+
+	var allFeatures []Feature
+
+	for _, pwaCode := range pwaCodes {
+		for _, layerName := range layerNames {
+			collectionID, err := FindCollectionID(pwaCode, layerName)
+			if err != nil {
+				log.Printf("ExportMerged: skip %s/%s: %v", pwaCode, layerName, err)
+				continue
+			}
+
+			ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+
+			featuresCol := config.GetMongoCollection(fmt.Sprintf("features_%s", collectionID))
+
+			filter := bson.M{}
+			if startDate != "" || endDate != "" {
+				layerCfg := LayerConfigs[layerName]
+				dateField := "properties." + layerCfg.DateField
+				dateFilter := buildDateFilter(dateField, startDate, endDate)
+				if dateFilter != nil {
+					filter = dateFilter
+				}
+			}
+
+			projection := options.Find().SetProjection(bson.M{
+				"geometry":   1,
+				"properties": 1,
+				"_id":        0,
+			})
+
+			cursor, err := featuresCol.Find(ctx, filter, projection)
+			if err != nil {
+				cancel()
+				log.Printf("ExportMerged: query %s/%s failed: %v", pwaCode, layerName, err)
+				continue
+			}
+
+			for cursor.Next(ctx) {
+				var doc bson.M
+				if err := cursor.Decode(&doc); err != nil {
+					continue
+				}
+
+				geom := doc["geometry"]
+				if geom == nil {
+					continue
+				}
+
+				props := make(map[string]interface{})
+				// Add identification tags
+				props["_pwaCode"] = pwaCode
+				props["_layerName"] = layerName
+				props["_layerDisplayName"] = GetLayerDisplayName(layerName)
+
+				if p, ok := doc["properties"].(bson.M); ok {
+					for k, v := range p {
+						switch val := v.(type) {
+						case primitive.DateTime:
+							props[k] = val.Time().Format(time.RFC3339)
+						case bson.M, bson.A:
+							continue
+						default:
+							props[k] = v
+						}
+					}
+				}
+
+				allFeatures = append(allFeatures, Feature{
+					Type:       "Feature",
+					Geometry:   cleanBsonForJSON(geom),
+					Properties: props,
+				})
+			}
+			cursor.Close(ctx)
+			cancel()
+		}
+	}
+
+	if len(allFeatures) == 0 {
+		return nil, fmt.Errorf("no features found for merge export")
+	}
+
+	fc := map[string]interface{}{
+		"type":     "FeatureCollection",
+		"features": allFeatures,
+		"metadata": map[string]interface{}{
+			"pwaCodes":   pwaCodes,
+			"layers":     layerNames,
+			"count":      len(allFeatures),
+			"mergeExport": true,
+		},
+	}
+
+	log.Printf("[Export] Merged GeoJSON: %d pwaCodes × %d layers → %d features",
+		len(pwaCodes), len(layerNames), len(allFeatures))
+
+	return json.Marshal(fc)
+}
