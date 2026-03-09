@@ -22,6 +22,7 @@
     />
     <link rel="stylesheet" href="/pwa_gis_tracking/static/css/style.css" />
     <link rel="stylesheet" href="/pwa_gis_tracking/static/css/responsive.css" />
+    <link rel="stylesheet" href="/pwa_gis_tracking/static/css/chatbot.css" />
     <style>
       #detailMapContainer {
         display: none;
@@ -515,6 +516,7 @@
             <h3>
               <i class="fa-solid fa-map-location-dot"></i>
               <span id="mapTitle">แผนที่ข้อมูล</span>
+              <!-- <span id="dmapZoom" style="margin-left: 10px; color: #666; font-size: 0.8em; font-weight: normal;"></span> -->
             </h3>
             <span
               id="mapFeatureCount"
@@ -767,5 +769,56 @@
           : "fa-solid fa-bars";
       }
     </script>
+
+
+    <!-- ═══ Chatbot "น้องหนึ่งน้ำ" ═══ -->
+    <button id="chatbotFab" class="pulse" onclick="toggleChatbot()" title="สอบถามข้อมูล GIS กับน้องหนึ่งน้ำ">
+      <i class="fa-solid fa-comments fab-icon"></i>
+    </button>
+
+    <div id="chatbotPanel">
+      <div class="chatbot-header">
+        <div class="chatbot-avatar">
+          <i class="fa-solid fa-droplet" style="color: var(--pwa-blue-dark)"></i>
+        </div>
+        <div class="chatbot-header-text">
+          <div class="chatbot-title">น้องหนึ่งน้ำ</div>
+          <div class="chatbot-subtitle">ผู้ช่วย GIS อัจฉริยะ</div>
+        </div>
+        <button onclick="toggleChatbot()" class="chatbot-close">&times;</button>
+      </div>
+
+      <div id="chatMessages" class="chatbot-messages">
+        <div class="chat-msg bot">
+          <div class="chat-bubble">
+            สวัสดีค่ะ! สอบถามข้อมูล GIS กับน้องหนึ่งน้ำได้เลยค่ะ
+            <br /><br />ตัวอย่างคำถาม:
+            <ul>
+              <li onclick="askSuggestion('แสดงตำแหน่งหัวดับเพลิงทั้งหมด')">แสดงตำแหน่งหัวดับเพลิงทั้งหมด</li>
+              <li onclick="askSuggestion('จำนวนมาตรวัดน้ำทั้งหมดในสาขา')">จำนวนมาตรวัดน้ำทั้งหมดในสาขา</li>
+              <li onclick="askSuggestion('ท่อขนาด 100 มม. ยาวรวมกี่เมตร')">ท่อขนาด 100 มม. ยาวรวมกี่เมตร</li>
+              <li onclick="askSuggestion('ขอรายชื่อสาขาทั้งหมดในเขต 2')">ขอรายชื่อสาขาทั้งหมดในเขต 2</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="chatbot-input-area">
+        <input
+          type="text"
+          id="chatInput"
+          placeholder="พิมพ์คำถามที่นี่..."
+          onkeypress="if(event.key==='Enter')sendChatMessage()"
+          maxlength="500"
+          autocomplete="off"
+        />
+        <button id="chatSendBtn" onclick="sendChatMessage()" class="chatbot-send" title="ส่ง">
+          <i class="fa-solid fa-paper-plane"></i>
+        </button>
+      </div>
+    </div>
+
+    <script src="/pwa_gis_tracking/static/js/chatbot.js"></script>
+
   </body>
 </html>

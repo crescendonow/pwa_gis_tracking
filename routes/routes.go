@@ -66,6 +66,9 @@ func RegisterRoutes(router *gin.Engine) {
 			api.GET("/field-mapping", handlers.GetFieldMapping)
 			// Session info (for permission-aware UI)
 			api.GET("/session/info", handlers.GetSessionInfo)
+
+			// Chatbot — text-to-query (proxy to Python service)
+			api.POST("/chatbot/query", handlers.ChatbotQuery)
 		}
 
 		// Health check

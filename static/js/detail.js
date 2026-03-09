@@ -522,6 +522,34 @@ function ensureMap() {
             center: [100.5, 13.75], zoom: 8
         });
         detailMap.addControl(new maplibregl.NavigationControl(), 'top-right');
+
+        class ZoomDisplayControl {
+            onAdd(map) {
+                this._map = map;
+                this._container = document.createElement('div');
+                this._container.className = 'maplibregl-ctrl maplibregl-ctrl-group'; // ใช้ class มาตรฐานของ maplibre
+                this._container.style.padding = '5px 10px';
+                this._container.style.fontSize = '12px';
+                this._container.style.fontWeight = 'bold';
+                this._container.style.background = 'white';
+                this._container.style.color = 'grey';
+                this._container.innerHTML = 'Zoom: ' + map.getZoom().toFixed(2);
+                
+                // อัปเดตเลขเมื่อมีการซูม
+                map.on('zoom', () => {
+                    this._container.innerHTML = 'Zoom: ' + map.getZoom().toFixed(2);
+                });
+                
+                return this._container;
+            }
+            onRemove() {
+                this._container.parentNode.removeChild(this._container);
+                this._map = undefined;
+            }
+        }
+        detailMap.addControl(new ZoomDisplayControl(), 'bottom-left');
+
+
         return detailMap;
     } catch (e) { console.error('Map init error:', e); return null; }
 }
@@ -569,6 +597,9 @@ function toggleBasemap() {
         }
         detailMap._pwaQuery = { pwaCode: pwaCode, collection: null };
     });
+
+
+
 }
 
 function clearMapFeatures() {
@@ -630,7 +661,9 @@ async function loadMapForBranch(pwaCode, startDate, endDate) {
             layerPanelHtml += '<label class="map-layer-toggle"><input type="checkbox" checked onchange="toggleMapLayer(this,\'' + layerName + '\')" />' +
                 '<span class="ldot" style="background:' + cfg.color + '"></span>' + escapeHtml(displayName) + ' (' + geojson.features.length + ')</label>';
         } catch (e) { console.error('Load map layer ' + layerName + ':', e); }
+        
     }
+
 
     document.getElementById('mapFeatureCount').textContent = formatNumber(totalFeatures) + ' features';
     document.getElementById('mapLayerPanel').innerHTML = '<div style="font-size:11px;font-weight:600;color:var(--pwa-gold);padding:4px 6px;margin-bottom:4px">ชั้นข้อมูล</div>' + layerPanelHtml;
@@ -729,16 +762,43 @@ function addLayerToMap(map, layerName, sourceId, pwaCode) {
                 filter: ['==', '$type', 'Point'],
                 layout: {
                     'icon-image': iconId,
-                    'icon-size': ['interpolate', ['linear'], ['zoom'],
-                        6, 0.15,
+                    /* 1. ส่วนการปรับขนาดไอคอน (Icon Size Scaling) */
+                    'icon-size': ['interpolate', ['exponential', 1.5], ['zoom'],
+                    //การใช้เลขยกกำลังแทนการเพิ่มแบบเส้นตรง (Linear) จะทำให้ขนาดไอคอนดู "คงที่" ในสายตาคนใช้ขณะเคลื่อนที่เข้าออกแผนที่ครับ
+                        /*6, 0.15,
                         10, 0.35,
                         13, 0.55,
                         16, 0.8,
-                        18, 1.0
+                        18, 1.0,*/
+
+                        10, 0.15,  // ซูมไกล: ขนาด 15% (เห็นเป็นจุดเล็กๆ)
+                        13, 0.20,  // ซูมกลาง: ขนาด 35%
+                        16, 0.30,  // ซูมใกล้: ขนาด 70% (เริ่มเห็นรายละเอียดไอคอนชัดเจน)
+                        18, 0.30,   // ซูมลึกมาก: ขนาด 110% (เพื่อให้ User คลิกจิ้มดูข้อมูลได้ง่ายขึ้น)
+                        22, 1.00   // ซูมลึกมาก: ขนาด 110% (เพื่อให้ User คลิกจิ้มดูข้อมูลได้ง่ายขึ้น)
                     ],
-                    'icon-allow-overlap': ['step', ['zoom'], false, 15, true],
+                    /* 2. การจัดการระยะห่าง (Collision & Padding) */
+                    // 'icon-padding' คือระยะห่างรอบไอคอน ถ้าไอคอนใกล้กันเกินไป ตัวที่สำคัญน้อยกว่าจะถูกซ่อน
+                    'icon-padding': 1,// กันไม่ให้ไอคอนติดกันเกินไปจนดูรก
+                    // 'icon-allow-overlap' ตั้งเป็น false เพื่อป้องกันไอคอนทับกันจนอ่านไม่ออก
+                    'icon-allow-overlap': false, // ตัวไหนที่ทับกัน ระบบจะซ่อนตัวที่สำคัญน้อยกว่าอัตโนมัติ
+                    //'icon-allow-overlap': ['step', ['zoom'], false, 15, true],
                     'icon-ignore-placement': false,
-                    'icon-padding': 2
+                    //'symbol-z-order': 'auto'
+                    
+                },
+                paint: {
+                    /* 3. ส่วนความโปร่งใส (Opacity) เสริมให้ดูเนียนตาขึ้น */
+                    'icon-opacity': [
+                        'interpolate', ['linear'], ['zoom'],
+                        11, 0,    // ถ้าซูมไกลกว่าระดับ 11 ให้ซ่อนไปเลยเพื่อความสะอาด
+                        12, 1,   // พอเข้าสู่ระดับ 12 ให้ค่อยๆ ปรากฏจนชัดเจน
+                        14, 1     // ระยะซูม 14 ขึ้นไป: แสดงชัดเจน 100%
+                    ],
+                    // 4. เพิ่มขอบ (HALO) เพื่อให้เห็นชัดบนทุก Basemap (ทั้ง OSM และ Satellite)
+                    'icon-halo-color': '#ffffff',
+                    'icon-halo-width': 1,
+                    'icon-halo-blur': 0.5
                 }
             });
             mapLoadedLayers.push(symbolId);
