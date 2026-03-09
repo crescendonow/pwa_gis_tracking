@@ -17,7 +17,16 @@ log = logging.getLogger("text_to_query")
 # ── Service ──────────────────────────────────────────
 PORT = int(os.getenv("PORT", "5022"))
 
-# ── Ollama LLM ───────────────────────────────────────
+# ── LLM Provider ────────────────────────────────────
+# "gemini" (default, fast & cheap) or "ollama" (local, free but slow)
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "gemini")
+LLM_TIMEOUT = int(os.getenv("LLM_TIMEOUT", "30"))
+
+# ── Gemini Flash ────────────────────────────────────
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+
+# ── Ollama (fallback) ──────────────────────────────
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "scb10x/typhoon2.1-gemma3-4b")
 OLLAMA_TIMEOUT = int(os.getenv("OLLAMA_TIMEOUT", "600"))

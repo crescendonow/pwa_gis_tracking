@@ -15,7 +15,7 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from starlette.responses import JSONResponse
 
-from config import PORT, RATE_LIMIT, OLLAMA_MODEL
+from config import PORT, RATE_LIMIT, LLM_PROVIDER, GEMINI_MODEL, OLLAMA_MODEL
 from cache import get_cached, set_cached
 from rule_parser import parse_rule
 from intent import generate_query_intent
@@ -68,7 +68,8 @@ async def health():
     from config import pg_engine, mongo_db
     return {
         "status": "Text-to-Query service is running",
-        "model": OLLAMA_MODEL,
+        "llm_provider": LLM_PROVIDER,
+        "model": GEMINI_MODEL if LLM_PROVIDER == "gemini" else OLLAMA_MODEL,
         "postgis_connected": pg_engine is not None,
         "mongodb_connected": mongo_db is not None,
         "branches_loaded": len(_code_to_name),
@@ -239,7 +240,7 @@ async def text_to_query(req: QueryRequest, request: Request):
         pwa_code=pwa_code,
         execution_time_ms=elapsed_ms,
         cached=False,
-        model="rule-based" if used_rule else OLLAMA_MODEL,
+        model="rule-based" if used_rule else (GEMINI_MODEL if LLM_PROVIDER == "gemini" else OLLAMA_MODEL),
     )
 
     # 6. Cache store
