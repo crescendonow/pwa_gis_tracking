@@ -88,6 +88,19 @@ PIPE_FUNCTIONS = {
 }
 _SORTED_PIPE_FUNC_KW = sorted(PIPE_FUNCTIONS.keys(), key=len, reverse=True)
 
+# ── Meter status mapping ──────────────────────────────────
+# custStat: 1=ปกติ, 2=ฝากมาตร, 3=หยุดจ่ายน้ำ, 4=ตัดมาตร, 5=ยกเลิกถาวร
+METER_STATUS_KW = {
+    "มาตรตาย": ("3", "หยุดจ่ายน้ำ"),
+    "หยุดจ่ายน้ำ": ("3", "หยุดจ่ายน้ำ"),
+    "มาตรปกติ": ("1", "ปกติ"),
+    "มาตรใช้งาน": ("1", "ปกติ"),
+    "ฝากมาตร": ("2", "ฝากมาตร"),
+    "ตัดมาตร": ("4", "ตัดมาตร"),
+    "ยกเลิกถาวร": ("5", "ยกเลิกถาวร"),
+}
+_SORTED_METER_STATUS_KW = sorted(METER_STATUS_KW.keys(), key=len, reverse=True)
+
 
 def _detect_layer(text):
     """Detect which GIS layer the user is asking about."""
@@ -115,6 +128,52 @@ def _detect_pipe_function(text):
     return None, None
 
 
+def _detect_meter_status(text):
+    """Detect meter status filter (มาตรตาย, มาตรปกติ, etc.)."""
+    for kw in _SORTED_METER_STATUS_KW:
+        if kw in text:
+            return METER_STATUS_KW[kw]
+    return None, None
+
+
+def _detect_inch_size(text):
+    """Detect size in inches and convert to mm (e.g. '4 นิ้ว' → 100)."""
+    m = re.search(r"(\d+)\s*นิ้ว", text)
+    if m:
+        inches = int(m.group(1))
+        return str(int(inches * 25.4))
+    return None
+
+
+def _detect_year_range(text):
+    """Detect year-based filter (e.g. 'ก่อนปี 2560', 'หลังปี 2565')."""
+    # "ก่อนปี 2560" → yearInstall <= 2560
+    m = re.search(r"ก่อน\s*(?:ปี\s*)?(?:พ\.?ศ\.?\s*)?(\d{4})", text)
+    if m:
+        year = int(m.group(1))
+        if year < 2400:
+            year += 543
+        return {"$lte": year}
+    # "หลังปี 2560" → yearInstall >= 2560
+    m = re.search(r"(?:หลัง|ตั้งแต่ปี)\s*(?:พ\.?ศ\.?\s*)?(\d{4})", text)
+    if m:
+        year = int(m.group(1))
+        if year < 2400:
+            year += 543
+        return {"$gte": year}
+    return None
+
+
+def _detect_exclude_sleeve(text):
+    """Detect if user wants to exclude ท่อปลอก (functionId != '6')."""
+    return bool(re.search(r"ไม่รวมท่อปลอก|ไม่นับท่อปลอก|ยกเว้นท่อปลอก", text))
+
+
+def _detect_large_pipe(text):
+    """Detect 'ท่อขนาดใหญ่' keyword → size >= 400."""
+    return bool(re.search(r"ท่อขนาดใหญ่|ท่อใหญ่", text))
+
+
 def _detect_size(text):
     """Extract pipe/meter size from text (e.g. '100 มม.', 'ขนาด 200')."""
     m = re.search(r"ขนาด\s*(\d+)\s*(?:มม\.?|มิลลิเมตร)?", text)
@@ -136,9 +195,14 @@ def _detect_size_gte(text):
     m = re.search(r"ตั้งแต่\s*(?:ขนาด\s*)?(\d+)", text)
     if m:
         return m.group(1)
-    # "มากกว่า 100" / "เกิน 100"
+    # "มากกว่า 100" / "เกิน 100" — but NOT "อายุเกิน 10 ปี"
     m = re.search(r"(?:มากกว่า|เกิน|เกินกว่า)\s*(\d+)", text)
     if m:
+        # Skip if this is an age context (มี "อายุ" อยู่ข้างหน้า หรือ "ปี" ข้างหลัง)
+        num_end = m.end()
+        after = text[num_end:num_end + 10]
+        if re.search(r"อายุ", text[:m.start() + 10]) and re.search(r"ปี", after):
+            return None
         return m.group(1)
     return None
 
@@ -217,7 +281,8 @@ def _build_match(pwa_code, pipe_type=None, pipe_func_id=None, size=None, size_gt
     if size and not size_gte:
         match["properties.sizeId"] = size
     if size_gte:
-        match["properties.sizeId"] = {"$gte": size_gte}
+        # Use $expr with $toInt for numeric comparison (sizeId is stored as string)
+        match["$expr"] = {"$gte": [{"$toInt": "$properties.sizeId"}, int(size_gte)]}
     if extra:
         match.update(extra)
     return {"$match": match} if match else {"$match": {}}
@@ -249,7 +314,13 @@ def parse_rule(prompt, pwa_code=""):
     is_pipe_total = layer == "pipe" and bool(re.search(
         r"รวม.*(?:เมตร|กม|กิโล)|ยาว.*(?:รวม|ทั้งหมด|กี่)", text
     ))
-    is_nationwide = bool(re.search(r"ทั้งประเทศ|ทุกสาขา|ทั้งหมดทุก", text))
+    zone = _detect_postgis_zone(text)
+
+    is_nationwide = bool(re.search(r"ทั้งประเทศ|ทุกสาขา|ทั้งหมดทุก|รวมทุกเขต", text))
+    # "ทั้งหมด" without a specific branch name → nationwide
+    if not is_nationwide and re.search(r"ทั้งหมด", text):
+        if not re.search(r"สาขา", text) and not zone and not pwa_code:
+            is_nationwide = True
 
     size = _detect_size(text)
     size_gte = _detect_size_gte(text)
@@ -259,7 +330,27 @@ def parse_rule(prompt, pwa_code=""):
     pipe_type = _detect_pipe_type(text) if layer == "pipe" else None
     pipe_func_id, pipe_func_label = _detect_pipe_function(text) if layer == "pipe" else (None, None)
     want_km = _detect_unit_km(text)
-    zone = _detect_postgis_zone(text)
+    meter_stat_id, meter_stat_label = _detect_meter_status(text) if layer == "meter" else (None, None)
+    inch_size = _detect_inch_size(text)
+    year_range = _detect_year_range(text) if layer == "pipe" else None
+    exclude_sleeve = _detect_exclude_sleeve(text) if layer == "pipe" else False
+    is_large_pipe = _detect_large_pipe(text) if layer == "pipe" else False
+
+    # Inch → mm conversion (e.g. "4 นิ้ว" → "100")
+    if inch_size and not size:
+        size = inch_size
+    if inch_size and not size_gte:
+        size_gte = inch_size
+
+    # "ท่อขนาดใหญ่" → size >= 400
+    if is_large_pipe and not size_gte:
+        size_gte = "400"
+
+    # Disambiguate: if age detected, don't treat same number as size
+    if age and size_gte and str(age) == size_gte:
+        size_gte = None
+    if age and size and str(age) == size:
+        size = None
 
     # If nationwide query, clear pwa_code
     effective_pwa = "" if is_nationwide else pwa_code
@@ -296,9 +387,85 @@ def parse_rule(prompt, pwa_code=""):
             "_rule_matched": "postgis_all_branches",
         }
 
-    # Count fire hydrants / pipe in zone (needs PostGIS to get pwa_codes first)
-    # e.g. "จำนวนหัวดับเพลิงทั้งหมดใน เขต 10"
-    # This requires multi-step query → let LLM handle for now
+    # ─────────────────────────────────────────────────────
+    # ZONE + LAYER: "ความยาวท่อรวม ของเขต 9", "จำนวนหัวดับเพลิงใน เขต 10"
+    # These require querying ALL branches in the zone (multi-collection)
+    # ─────────────────────────────────────────────────────
+    if zone and layer:
+        extra = {}
+        if age and layer == "pipe":
+            cutoff_year = datetime.now().year + 543 - age
+            extra["properties.yearInstall"] = {"$lte": cutoff_year}
+
+        match_stage = _build_match(
+            "",  # no single pwa_code — will iterate all branches in zone
+            pipe_type if layer == "pipe" else None,
+            pipe_func_id if layer == "pipe" else None,
+            size, size_gte, extra
+        )
+
+        # Determine operation type
+        if is_total_length or (layer == "pipe" and is_pipe_total):
+            pipeline = [
+                match_stage,
+                {"$group": {"_id": None, "total_length": {"$sum": {"$toDouble": "$properties.length"}}}},
+            ]
+            if want_km:
+                pipeline.append({"$project": {"_id": 0, "total_length_km": {"$round": [{"$divide": ["$total_length", 1000]}, 2]}}})
+            else:
+                pipeline.append({"$project": {"_id": 0, "total_length": {"$round": ["$total_length", 2]}}})
+
+            desc_parts = ["ท่อประปา"]
+            if pipe_type:
+                desc_parts.append("ชนิด {}".format(pipe_type))
+            if size_gte:
+                desc_parts.append("ขนาด {} มม. ขึ้นไป".format(size_gte))
+            if age:
+                desc_parts.append("อายุ {} ปีขึ้นไป".format(age))
+
+            return {
+                "text_response": "กำลังคำนวณความยาวรวมของ{} ในเขต {} ค่ะ".format(" ".join(desc_parts), zone),
+                "target_db": "mongo",
+                "response_type": "numeric",
+                "intent_summary": "Total pipe length in zone {}".format(zone),
+                "query": {
+                    "mongo": {
+                        "pwa_code": None,
+                        "layer": layer,
+                        "pipeline": pipeline,
+                        "operation": "aggregate",
+                    }
+                },
+                "_zone": zone,
+                "_rule_matched": "zone_pipe_total_length",
+            }
+        else:
+            # Count query for zone
+            filt = match_stage["$match"]
+            desc_parts = [layer_label]
+            if pipe_type:
+                desc_parts.append("ชนิด {}".format(pipe_type))
+            if size_gte:
+                desc_parts.append("ขนาด {} มม. ขึ้นไป".format(size_gte))
+            if age:
+                desc_parts.append("อายุ {} ปีขึ้นไป".format(age))
+
+            return {
+                "text_response": "กำลังนับจำนวน{} ในเขต {} ค่ะ".format(" ".join(desc_parts), zone),
+                "target_db": "mongo",
+                "response_type": "numeric",
+                "intent_summary": "Count {} in zone {}".format(layer, zone),
+                "query": {
+                    "mongo": {
+                        "pwa_code": None,
+                        "layer": layer,
+                        "pipeline": [filt],
+                        "operation": "count",
+                    }
+                },
+                "_zone": zone,
+                "_rule_matched": "zone_count",
+            }
 
     if not layer:
         return None  # Can't determine layer → fallback to LLM
@@ -309,7 +476,16 @@ def parse_rule(prompt, pwa_code=""):
     # "ความยาวท่อส่งน้ำรวม ของสาขาจันทบุรี"
     # ─────────────────────────────────────────────────────
     if layer == "pipe" and (is_total_length or is_pipe_total):
-        match_stage = _build_match(effective_pwa, pipe_type, pipe_func_id, size, size_gte)
+        extra = {}
+        if age:
+            cutoff_year = datetime.now().year + 543 - age  # พ.ศ.
+            extra["properties.yearInstall"] = {"$lte": cutoff_year}
+        if year_range:
+            extra["properties.yearInstall"] = year_range
+        if exclude_sleeve:
+            extra["properties.functionId"] = {"$ne": "6"}
+
+        match_stage = _build_match(effective_pwa, pipe_type, pipe_func_id, size, size_gte, extra)
 
         pipeline = [
             match_stage,
@@ -337,12 +513,17 @@ def parse_rule(prompt, pwa_code=""):
             desc_parts.append("ขนาด {} มม. ขึ้นไป".format(size_gte))
         elif size:
             desc_parts.append("ขนาด {} มม.".format(size))
+        if age:
+            desc_parts.append("อายุ {} ปีขึ้นไป".format(age))
         desc = " ".join(desc_parts)
         if desc:
             desc = " " + desc
 
-        return {
-            "text_response": "กำลังคำนวณความยาวรวมของท่อประปา{}ค่ะ".format(desc),
+        result = {
+            "text_response": "กำลังคำนวณความยาวรวมของท่อประปา{}{}ค่ะ".format(
+                desc,
+                " ทั้งประเทศ" if is_nationwide else "",
+            ),
             "target_db": "mongo",
             "response_type": "numeric",
             "intent_summary": "Total pipe length{}".format(" " + desc if desc else ""),
@@ -356,6 +537,9 @@ def parse_rule(prompt, pwa_code=""):
             },
             "_rule_matched": "pipe_total_length",
         }
+        if is_nationwide:
+            result["_nationwide"] = True
+        return result
 
     # ─────────────────────────────────────────────────────
     # GROUP BY — "ท่อแยกตามขนาด", "ท่อแยกตามชนิด"
@@ -428,7 +612,7 @@ def parse_rule(prompt, pwa_code=""):
 
             project_stage = {"$project": {"_id": 0, group_label: "$_id", "จำนวน": "$count"}}
             if extra_accum:
-                project_stage = {"$project": {"_id": 0, group_label: "$_id", "จำนวน": 1, "ความยามรวม": 1}}
+                project_stage = {"$project": {"_id": 0, group_label: "$_id", "จำนวน": 1, "ความยาวรวม": 1}}
 
             pipeline = [
                 match_stage,
@@ -456,8 +640,9 @@ def parse_rule(prompt, pwa_code=""):
     # SHOW POSITION — "แสดงตำแหน่งหัวดับเพลิง"
     # "แสดงท่อชนิด HDPE ขนาด 100 ขึ้นไป"
     # "แสดงตำแหน่งมาตรวัดน้ำอายุ 20 ปีขึ้นไป"
+    # "แสดงตำแหน่งหัวดับเพลิงทั้งหมด" (ทั้งหมด triggers is_count, but still show position)
     # ─────────────────────────────────────────────────────
-    if is_show_position and not is_count and not is_group:
+    if is_show_position and not is_group:
         extra = {}
 
         # Age filter for pipes (yearInstall) and meters (beginCustDate)
@@ -488,8 +673,11 @@ def parse_rule(prompt, pwa_code=""):
         if age:
             desc_parts.append("อายุ {} ปีขึ้นไป".format(age))
 
-        return {
-            "text_response": "กำลังค้นหาตำแหน่ง{}ค่ะ".format(" ".join(desc_parts)),
+        result = {
+            "text_response": "กำลังค้นหาตำแหน่ง{}{}ค่ะ".format(
+                " ".join(desc_parts),
+                " ทั้งประเทศ" if is_nationwide else "",
+            ),
             "target_db": "mongo",
             "response_type": "geojson",
             "intent_summary": "Show {} positions".format(layer),
@@ -503,6 +691,34 @@ def parse_rule(prompt, pwa_code=""):
             },
             "_rule_matched": "show_position",
         }
+        if is_nationwide:
+            result["_nationwide"] = True
+        return result
+
+    # ─────────────────────────────────────────────────────
+    # COUNT with meter status — "จำนวนมาตรตาย", "มาตรปกติกี่เครื่อง"
+    # ─────────────────────────────────────────────────────
+    if is_count and meter_stat_id and layer == "meter":
+        filt = {}
+        if effective_pwa:
+            filt["properties.pwaCode"] = effective_pwa
+        filt["properties.custStat"] = meter_stat_id
+
+        return {
+            "text_response": "กำลังนับจำนวนมาตรวัดน้ำ สถานะ{}ค่ะ".format(meter_stat_label),
+            "target_db": "mongo",
+            "response_type": "numeric",
+            "intent_summary": "Count meters with custStat={}".format(meter_stat_id),
+            "query": {
+                "mongo": {
+                    "pwa_code": effective_pwa or None,
+                    "layer": "meter",
+                    "pipeline": [filt],
+                    "operation": "count",
+                }
+            },
+            "_rule_matched": "count_meter_status",
+        }
 
     # ─────────────────────────────────────────────────────
     # COUNT with type + size filter — "ท่อ AC ขนาด 100 กี่ท่อ"
@@ -512,6 +728,10 @@ def parse_rule(prompt, pwa_code=""):
         if age and layer == "pipe":
             cutoff_year = datetime.now().year + 543 - age
             extra["properties.yearInstall"] = {"$lte": cutoff_year}
+        if year_range and layer == "pipe":
+            extra["properties.yearInstall"] = year_range
+        if exclude_sleeve and layer == "pipe":
+            extra["properties.functionId"] = {"$ne": "6"}
 
         match_stage = _build_match(
             effective_pwa,
@@ -634,8 +854,11 @@ def parse_rule(prompt, pwa_code=""):
         if effective_pwa:
             filt["properties.pwaCode"] = effective_pwa
 
-        return {
-            "text_response": "กำลังนับจำนวน{}ทั้งหมดค่ะ".format(layer_label),
+        result = {
+            "text_response": "กำลังนับจำนวน{}ทั้งหมด{}ค่ะ".format(
+                layer_label,
+                " ทั้งประเทศ" if is_nationwide else "",
+            ),
             "target_db": "mongo",
             "response_type": "numeric",
             "intent_summary": "Count all {}".format(layer),
@@ -649,6 +872,129 @@ def parse_rule(prompt, pwa_code=""):
             },
             "_rule_matched": "count_all",
         }
+        if is_nationwide:
+            result["_nationwide"] = True
+        return result
 
     # No pattern matched
     return None
+
+
+def parse_followup(text, prev_context):
+    """
+    Parse a follow-up query that modifies the previous query context.
+    E.g., after "ความยาวท่อ AC สาขาเชียงใหม่", user says "ขนาด 100 มม.ขึ้นไป"
+    → merge new filter into the previous pipeline.
+
+    prev_context: dict with layer, pwa_code, operation, pipeline, response_type, timestamp
+    Returns: intent dict (same format as parse_rule) or None.
+    """
+    if not prev_context:
+        return None
+
+    layer = prev_context.get("layer", "")
+    if not layer:
+        return None
+
+    # Don't follow up if text explicitly mentions a DIFFERENT layer
+    detected_layer, _ = _detect_layer(text)
+    if detected_layer and detected_layer != layer:
+        return None
+
+    # ── Detect modifiers from text ──────────────────────
+    size = _detect_size(text)
+    size_gte = _detect_size_gte(text)
+    pipe_type = _detect_pipe_type(text) if layer == "pipe" else None
+    pipe_func_id, pipe_func_label = _detect_pipe_function(text) if layer == "pipe" else (None, None)
+    meter_stat_id, meter_stat_label = _detect_meter_status(text) if layer == "meter" else (None, None)
+    inch_size = _detect_inch_size(text)
+    age = _detect_age(text)
+    year_range = _detect_year_range(text) if layer == "pipe" else None
+    exclude_sleeve = _detect_exclude_sleeve(text) if layer == "pipe" else False
+
+    if inch_size and not size:
+        size = inch_size
+    if inch_size and not size_gte:
+        size_gte = inch_size
+
+    # Disambiguate age vs size
+    if age and size_gte and str(age) == size_gte:
+        size_gte = None
+    if age and size and str(age) == size:
+        size = None
+
+    # Must detect at least one modifier
+    if not any([size, size_gte, pipe_type, pipe_func_id, meter_stat_id, age, year_range, exclude_sleeve]):
+        return None
+
+    # ── Extract previous $match and merge new filters ───
+    prev_pipeline = list(prev_context.get("pipeline", []))
+    operation = prev_context.get("operation", "count")
+
+    if operation == "aggregate" and prev_pipeline:
+        if "$match" in prev_pipeline[0]:
+            prev_match = dict(prev_pipeline[0]["$match"])
+        else:
+            prev_match = dict(prev_pipeline[0])
+    elif prev_pipeline:
+        prev_match = dict(prev_pipeline[0])
+    else:
+        prev_match = {}
+
+    # Add new filters
+    if pipe_type:
+        prev_match["properties.typeId"] = pipe_type
+    if pipe_func_id:
+        prev_match["properties.functionId"] = pipe_func_id
+    if size and not size_gte:
+        prev_match["properties.sizeId"] = size
+    if size_gte:
+        prev_match["$expr"] = {"$gte": [{"$toInt": "$properties.sizeId"}, int(size_gte)]}
+    if meter_stat_id:
+        prev_match["properties.custStat"] = meter_stat_id
+    if age and layer == "pipe":
+        cutoff_year = datetime.now().year + 543 - age
+        prev_match["properties.yearInstall"] = {"$lte": cutoff_year}
+    if year_range and layer == "pipe":
+        prev_match["properties.yearInstall"] = year_range
+    if exclude_sleeve:
+        prev_match["properties.functionId"] = {"$ne": "6"}
+
+    # Rebuild pipeline
+    if operation == "aggregate":
+        new_pipeline = [{"$match": prev_match}] + prev_pipeline[1:]
+    else:
+        new_pipeline = [prev_match]
+
+    # ── Build description ───────────────────────────────
+    desc_parts = []
+    if pipe_type:
+        desc_parts.append("ชนิด {}".format(pipe_type))
+    if pipe_func_label:
+        desc_parts.append(pipe_func_label)
+    if size_gte:
+        desc_parts.append("ขนาด {} มม. ขึ้นไป".format(size_gte))
+    elif size:
+        desc_parts.append("ขนาด {} มม.".format(size))
+    if meter_stat_label:
+        desc_parts.append("สถานะ {}".format(meter_stat_label))
+    if age:
+        desc_parts.append("อายุ {} ปีขึ้นไป".format(age))
+    if exclude_sleeve:
+        desc_parts.append("ไม่รวมท่อปลอก")
+
+    return {
+        "text_response": "ต่อจากคำถามก่อนหน้า — เพิ่มเงื่อนไข {} ค่ะ".format(" ".join(desc_parts)),
+        "target_db": "mongo",
+        "response_type": prev_context.get("response_type", "numeric"),
+        "intent_summary": "Follow-up: add {} filter on {}".format(" ".join(desc_parts), layer),
+        "query": {
+            "mongo": {
+                "pwa_code": prev_context.get("pwa_code") or None,
+                "layer": layer,
+                "pipeline": new_pipeline,
+                "operation": operation,
+            }
+        },
+        "_rule_matched": "followup",
+    }

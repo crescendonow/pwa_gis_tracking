@@ -175,12 +175,14 @@ func GetDashboardSummary(c *gin.Context) {
 
 	// Count features for all branches concurrently
 	type branchResult struct {
-		PwaCode    string           `json:"pwa_code"`
-		BranchName string           `json:"branch_name"`
-		Zone       string           `json:"zone"`
-		Layers     map[string]int64 `json:"layers"`
-		Total      int64            `json:"total"`
-		PipeLong   float64          `json:"pipe_long"`
+		PwaCode          string           `json:"pwa_code"`
+		BranchName       string           `json:"branch_name"`
+		Zone             string           `json:"zone"`
+		Layers           map[string]int64 `json:"layers"`
+		Total            int64            `json:"total"`
+		PipeLong         float64          `json:"pipe_long"`
+		PipeLongExSleeve float64          `json:"pipe_long_ex_sleeve"`
+		ActiveMeter      int64            `json:"active_meter"`
 	}
 
 	results := make(chan branchResult, len(officeList))
@@ -201,7 +203,9 @@ func GetDashboardSummary(c *gin.Context) {
 				total += cnt
 			}
 			pipeLong, _ := services.SumPipeLength(pwa, startDate, endDate)
-			results <- branchResult{PwaCode: pwa, BranchName: name, Zone: z, Layers: layers, Total: total, PipeLong: pipeLong}
+			pipeLongExSleeve, _ := services.SumPipeLengthExcludingSleeve(pwa, startDate, endDate)
+			activeMeter, _ := services.CountActiveMeters(pwa, startDate, endDate)
+			results <- branchResult{PwaCode: pwa, BranchName: name, Zone: z, Layers: layers, Total: total, PipeLong: pipeLong, PipeLongExSleeve: pipeLongExSleeve, ActiveMeter: activeMeter}
 		}(o.PwaCode, o.Name, o.Zone)
 	}
 

@@ -6,6 +6,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 import sqlite3
 import time
 import unicodedata
@@ -60,10 +61,27 @@ def _init_db():
 _init_db()
 
 
+_FILLER_RE = re.compile(
+    r"(ครับ|ค่ะ|คะ|จ้า|จ้ะ|จ๊ะ|นะ|หน่อย|ด้วย|ช่วย|ขอ|อยากได้|อยาก|"
+    r"ให้หน่อย|ทีครับ|ทีค่ะ|สักหน่อย|ได้ไหม|ได้มั้ย|ได้มั้ยครับ|ได้ไหมครับ)"
+)
+
+_UNIT_SYNONYMS = [
+    (re.compile(r"กิโลเมตร"), "กม"),
+    (re.compile(r"มิลลิเมตร"), "มม"),
+    (re.compile(r"เมตร(?!ิ)"), "ม"),  # "เมตร" but not "เมตริก"
+]
+
+
 def _normalize(text):
-    """Normalize prompt text for consistent hashing."""
+    """Normalize prompt text for consistent hashing (fuzzy-friendly)."""
     text = text.strip().lower()
     text = unicodedata.normalize("NFC", text)
+    # Strip Thai filler/politeness words
+    text = _FILLER_RE.sub("", text)
+    # Normalize common unit synonyms
+    for pat, repl in _UNIT_SYNONYMS:
+        text = pat.sub(repl, text)
     # Collapse whitespace
     text = " ".join(text.split())
     return text

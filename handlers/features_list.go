@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
@@ -52,7 +53,15 @@ func GetFeaturesList(c *gin.Context) {
 		pageSize = 50
 	}
 
-	result, err := services.ListFeaturesPaginated(pwaCode, collection, startDate, endDate, search, page, pageSize)
+	raw := c.Query("raw") == "1"
+
+	// Parse column-specific filters (JSON string → map)
+	var filters map[string]string
+	if filtersStr := c.Query("filters"); filtersStr != "" {
+		json.Unmarshal([]byte(filtersStr), &filters)
+	}
+
+	result, err := services.ListFeaturesPaginated(pwaCode, collection, startDate, endDate, search, page, pageSize, raw, filters)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

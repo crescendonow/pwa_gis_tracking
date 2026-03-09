@@ -35,6 +35,8 @@ type ColumnInfo struct {
 func ListFeaturesPaginated(
 	pwaCode, collection, startDate, endDate, search string,
 	page, pageSize int,
+	raw bool,
+	filters map[string]string,
 ) (*PaginatedResult, error) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -100,6 +102,54 @@ func ListFeaturesPaginated(
 			} else {
 				filter["$or"] = orConds
 			}
+		}
+	}
+
+	// Column-specific filters (exact match or regex on specific MongoDB fields)
+	if len(filters) > 0 {
+		var andConds []bson.M
+		if existing, ok := filter["$and"]; ok {
+			andConds = existing.([]bson.M)
+		} else if len(filter) > 0 {
+			andConds = []bson.M{filter}
+		}
+
+		// ID columns that may be stored as int or string in MongoDB
+		numericIDFields := map[string]bool{
+			"PIPE_ID": true, "VALVE_ID": true, "FIRE_ID": true,
+			"LEAK_ID": true, "STRUCT_ID": true, "BLDG_ID": true,
+		}
+
+		for field, value := range filters {
+			propField := "properties." + field
+			// Date fields: use range matching (start of day to end of day)
+			if field == "recordDate" || field == "leakDatetime" || field == "beginCustDate" {
+				dateFilter := buildDateFilter(propField, value, value)
+				if dateFilter != nil {
+					andConds = append(andConds, dateFilter)
+				}
+			} else if numericIDFields[field] {
+				// ID columns: match both string and numeric types
+				var numVal int64
+				if _, err := fmt.Sscanf(value, "%d", &numVal); err == nil {
+					andConds = append(andConds, bson.M{
+						"$or": []bson.M{
+							{propField: value},
+							{propField: numVal},
+							{propField: int32(numVal)},
+						},
+					})
+				} else {
+					andConds = append(andConds, bson.M{propField: value})
+				}
+			} else {
+				// Exact match for other fields
+				andConds = append(andConds, bson.M{propField: value})
+			}
+		}
+
+		if len(andConds) > 0 {
+			filter = bson.M{"$and": andConds}
 		}
 	}
 
@@ -177,19 +227,24 @@ func ListFeaturesPaginated(
 			}
 		}
 
-		// Apply field mapping (mongo key → postgres key)
-		mapped := MapProperties(collection, rawProps)
+		// Apply field mapping (mongo key → postgres key) unless raw mode
+		var row map[string]interface{}
+		if raw {
+			row = rawProps
+		} else {
+			row = MapProperties(collection, rawProps)
+		}
 
 		// Add the MongoDB document _id as reference (hidden column)
 		if docID, ok := doc["_id"]; ok {
 			if oid, ok := docID.(primitive.ObjectID); ok {
-				mapped["_doc_id"] = oid.Hex()
+				row["_doc_id"] = oid.Hex()
 			} else {
-				mapped["_doc_id"] = fmt.Sprintf("%v", docID)
+				row["_doc_id"] = fmt.Sprintf("%v", docID)
 			}
 		}
 
-		data = append(data, mapped)
+		data = append(data, row)
 	}
 
 	if data == nil {
@@ -197,7 +252,22 @@ func ListFeaturesPaginated(
 	}
 
 	// Build ordered column info
-	columns := buildColumnInfo(collection)
+	var columns []ColumnInfo
+	if raw && len(data) > 0 {
+		// In raw mode, derive columns from the first data row (sorted alphabetically)
+		seen := map[string]bool{}
+		for _, row := range data {
+			for k := range row {
+				if k != "_doc_id" && k != "_createdBy" && !seen[k] {
+					columns = append(columns, ColumnInfo{Key: k, MongoKey: k})
+					seen[k] = true
+				}
+			}
+		}
+		sort.Slice(columns, func(i, j int) bool { return columns[i].Key < columns[j].Key })
+	} else {
+		columns = buildColumnInfo(collection)
+	}
 
 	log.Printf("[FeaturesList] %s/%s page=%d total=%d rows=%d search=%q",
 		pwaCode, collection, page, total, len(data), search)

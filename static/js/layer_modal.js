@@ -268,11 +268,22 @@ var LayerModal = (function() {
             'pwaCode=' + enc(state.pwaCode) +
             '&collection=' + enc(state.collection) +
             '&page=' + state.page +
-            '&pageSize=' + state.pageSize;
+            '&pageSize=' + state.pageSize +
+            '&raw=1';
 
         if (state.startDate) url += '&startDate=' + enc(state.startDate);
         if (state.endDate) url += '&endDate=' + enc(state.endDate);
-        if (state.search) url += '&search=' + enc(state.search);
+
+        if (state.search) {
+            // Parse structured filters from search text
+            var parsed = parseSearchFilters(state.search, state.collection);
+            if (Object.keys(parsed.filters).length > 0) {
+                url += '&filters=' + enc(JSON.stringify(parsed.filters));
+            }
+            if (parsed.freeText) {
+                url += '&search=' + enc(parsed.freeText);
+            }
+        }
 
         fetch(url)
             .then(function(res) {
@@ -346,12 +357,16 @@ var LayerModal = (function() {
             rows += '<tr><td style="text-align:center;color:#64748B;font-size:11px">' + (startIdx + r + 1) + '</td>';
             for (var ci = 0; ci < cols.length; ci++) {
                 var val = row[cols[ci].key];
+                // Force ID columns to text so they display/filter correctly
+                if (val !== null && val !== undefined && FORCE_TEXT_COLUMNS.indexOf(cols[ci].key) !== -1) {
+                    val = String(val);
+                }
                 if (val === null || val === undefined || val === '') {
                     rows += '<td class="empty">—</td>';
                 } else {
                     var str = fmtCell(val);
                     if (state.search) str = highlight(str, state.search);
-                    var isNum = typeof val === 'number';
+                    var isNum = typeof val === 'number' && FORCE_TEXT_COLUMNS.indexOf(cols[ci].key) === -1;
                     rows += '<td' + (isNum ? ' class="num"' : '') + ' title="' + esc(String(val)) + '">' + str + '</td>';
                 }
             }
@@ -405,6 +420,12 @@ var LayerModal = (function() {
     // ==========================================
     // Utility
     // ==========================================
+    // ID columns that should be treated as text (not formatted as numbers)
+    var FORCE_TEXT_COLUMNS = [
+        'PIPE_ID', 'VALVE_ID', 'FIRE_ID', 'LEAK_ID', 'STRUCT_ID', 'BLDG_ID',
+        'globalId', 'custCode', 'meterNo', 'houseCode'
+    ];
+
     function fmtCell(val) {
         if (typeof val === 'string') {
             if (/^\d{4}-\d{2}-\d{2}T/.test(val)) return val.substring(0, 10);
@@ -433,6 +454,160 @@ var LayerModal = (function() {
     function fmtNum(n) {
         if (n === null || n === undefined) return '0';
         return Number(n).toLocaleString('th-TH');
+    }
+
+    // ==========================================
+    // Smart Search Filter Parser
+    // ==========================================
+    var THAI_MONTHS = {
+        'ม.ค.': '01', 'มค': '01', 'มกราคม': '01',
+        'ก.พ.': '02', 'กพ': '02', 'กุมภาพันธ์': '02',
+        'มี.ค.': '03', 'มีค': '03', 'มีนาคม': '03',
+        'เม.ย.': '04', 'เมย': '04', 'เมษายน': '04',
+        'พ.ค.': '05', 'พค': '05', 'พฤษภาคม': '05',
+        'มิ.ย.': '06', 'มิย': '06', 'มิถุนายน': '06',
+        'ก.ค.': '07', 'กค': '07', 'กรกฎาคม': '07',
+        'ส.ค.': '08', 'สค': '08', 'สิงหาคม': '08',
+        'ก.ย.': '09', 'กย': '09', 'กันยายน': '09',
+        'ต.ค.': '10', 'ตค': '10', 'ตุลาคม': '10',
+        'พ.ย.': '11', 'พย': '11', 'พฤศจิกายน': '11',
+        'ธ.ค.': '12', 'ธค': '12', 'ธันวาคม': '12'
+    };
+    var SORTED_MONTH_KW = Object.keys(THAI_MONTHS).sort(function(a, b) { return b.length - a.length; });
+
+    // Column keywords per layer (Thai keyword → MongoDB field name)
+    var FILTER_KEYWORDS = {
+        meter: {
+            'สถานะมาตร': 'custStat', 'สถานะ': 'custStat',
+            'ชื่อผู้ใช้น้ำ': 'custFullName', 'ชื่อลูกค้า': 'custFullName', 'ชื่อ': 'custFullName',
+            'เลขมาตร': 'meterNo', 'ขนาดมาตร': 'meterSizeCode', 'ขนาด': 'meterSizeCode',
+            'รหัสลูกค้า': 'custCode', 'ที่อยู่': 'addressNo',
+            'วันที่ลงข้อมูล': 'recordDate', 'วันที่': 'recordDate',
+            'วันเริ่มใช้น้ำ': 'beginCustDate'
+        },
+        pipe: {
+            'ชนิดท่อ': 'typeId', 'ชนิด': 'typeId',
+            'ขนาดท่อ': 'sizeId', 'ขนาด': 'sizeId',
+            'หน้าที่': 'functionId', 'ฟังก์ชัน': 'functionId',
+            'เกรด': 'gradeId', 'ชั้นท่อ': 'classId',
+            'วันที่ลงข้อมูล': 'recordDate', 'วันที่': 'recordDate',
+            'ปีติดตั้ง': 'yearInstall'
+        },
+        valve: {
+            'ชนิด': 'typeId', 'ขนาด': 'sizeId', 'สถานะ': 'statusId',
+            'วันที่': 'recordDate'
+        },
+        firehydrant: {
+            'ขนาด': 'sizeId', 'สถานะ': 'statusId',
+            'วันที่': 'recordDate'
+        },
+        leakpoint: {
+            'สาเหตุ': 'cause', 'สถานะ': 'LeakStatus',
+            'วันที่แจ้ง': 'leakDatetime', 'วันที่': 'leakDatetime',
+            'ค่าซ่อม': 'repairCost', 'ชนิดท่อ': 'pipeTypeId'
+        },
+        bldg: {
+            'สถานะ': 'useStatusId', 'ชื่อ': 'custFullName',
+            'ที่อยู่': 'addressNo', 'วันที่': 'recordDate'
+        }
+    };
+
+    function parseThaiDate(text) {
+        // Match "21 ม.ค. 2569" / "21 มกราคม 2569"
+        for (var i = 0; i < SORTED_MONTH_KW.length; i++) {
+            var kw = SORTED_MONTH_KW[i];
+            var re = new RegExp('(\\d{1,2})\\s*' + kw.replace(/\./g, '\\.') + '\\s*(\\d{4})');
+            var m = text.match(re);
+            if (m) {
+                var day = m[1].padStart(2, '0');
+                var month = THAI_MONTHS[kw];
+                var year = parseInt(m[2]);
+                if (year > 2400) year -= 543;
+                return { date: year + '-' + month + '-' + day, matched: m[0] };
+            }
+        }
+        return null;
+    }
+
+    // Pipe type abbreviations for smart detection
+    var PIPE_TYPES_RE = /\b(PVC[_\-]?O|HDPE|PVC|AC|DI|CI|GS|ST|PB|GRP)\b/i;
+
+    // Primary ID column per collection (for pure-numeric search)
+    var PRIMARY_ID = {
+        pipe: 'PIPE_ID', valve: 'VALVE_ID', firehydrant: 'FIRE_ID',
+        meter: 'meterNo', bldg: 'BLDG_ID', leakpoint: 'LEAK_ID'
+    };
+
+    function parseSearchFilters(text, collection) {
+        var keywords = FILTER_KEYWORDS[collection] || {};
+        var sortedKw = Object.keys(keywords).sort(function(a, b) { return b.length - a.length; });
+        var filters = {};
+        var remaining = text;
+
+        // ── Smart detection: pipe type abbreviation + optional size ──
+        // e.g. "AC 100" → typeId=AC, sizeId=100
+        if (collection === 'pipe') {
+            var ptMatch = remaining.match(PIPE_TYPES_RE);
+            if (ptMatch) {
+                var typeVal = ptMatch[1].toUpperCase().replace('-', '_');
+                if (typeVal === 'PVCO') typeVal = 'PVC_O';
+                filters['typeId'] = typeVal;
+                remaining = remaining.replace(ptMatch[0], '').trim();
+                // Adjacent number → sizeId (2-4 digit range)
+                var sizeAfter = remaining.match(/^\s*(\d{2,4})\b/);
+                if (sizeAfter) {
+                    filters['sizeId'] = sizeAfter[1];
+                    remaining = remaining.replace(sizeAfter[0], '').trim();
+                }
+            }
+        }
+
+        // ── Smart detection: pure numeric (4+ digits) → primary ID column ──
+        // e.g. "11542" on pipe → PIPE_ID=11542
+        if (!Object.keys(filters).length && /^\d{4,}$/.test(remaining.trim())) {
+            var idCol = PRIMARY_ID[collection];
+            if (idCol) {
+                filters[idCol] = remaining.trim();
+                remaining = '';
+            }
+        }
+
+        // Extract Thai date first
+        var dateResult = parseThaiDate(remaining);
+        if (dateResult) {
+            // Find which date field keyword precedes the date
+            var dateField = 'recordDate'; // default
+            for (var di = 0; di < sortedKw.length; di++) {
+                var dk = sortedKw[di];
+                var field = keywords[dk];
+                if ((field === 'recordDate' || field === 'leakDatetime' || field === 'beginCustDate') &&
+                    remaining.indexOf(dk) !== -1 && remaining.indexOf(dk) < remaining.indexOf(dateResult.matched)) {
+                    dateField = field;
+                    remaining = remaining.replace(dk, '');
+                    break;
+                }
+            }
+            filters[dateField] = dateResult.date;
+            remaining = remaining.replace(dateResult.matched, '');
+        }
+
+        // Extract "keyword เป็น value" / "keyword value" patterns
+        for (var ki = 0; ki < sortedKw.length; ki++) {
+            var kw = sortedKw[ki];
+            var mongoField = keywords[kw];
+            if (filters[mongoField]) continue; // already set by date
+
+            // Pattern: "keyword เป็น value" or "keyword = value" or "keyword value"
+            var re = new RegExp(kw + '\\s*(?:เป็น|คือ|=|:|)\\s*([^\\s,]+)');
+            var match = remaining.match(re);
+            if (match) {
+                filters[mongoField] = match[1];
+                remaining = remaining.replace(match[0], '');
+            }
+        }
+
+        remaining = remaining.replace(/\s+/g, ' ').trim();
+        return { filters: filters, freeText: remaining };
     }
 
     // ==========================================

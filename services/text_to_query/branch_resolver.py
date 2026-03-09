@@ -123,6 +123,44 @@ def is_valid_pwa_code(pwa_code):
     return pwa_code in _code_to_name
 
 
+def get_codes_in_zone(zone):
+    """
+    Get all pwa_codes in a given zone.
+
+    Args:
+        zone: Zone number (string, e.g. "9")
+
+    Returns:
+        list of (pwa_code, name) tuples
+    """
+    if pg_engine is None:
+        log.warning("[branch_resolver] pg_engine is None — cannot query zone")
+        return []
+
+    try:
+        with pg_engine.connect() as conn:
+            rows = conn.execute(
+                text("SELECT pwa_code, name FROM pwa_office.pwa_office234 WHERE zone = :zone ORDER BY name"),
+                {"zone": str(zone)}
+            ).fetchall()
+        result = [(str(r[0]).strip(), str(r[1]).strip()) for r in rows]
+        log.info("[branch_resolver] Zone %s: found %d branches", zone, len(result))
+        return result
+    except Exception as exc:
+        log.error("[branch_resolver] Zone query failed: %s", exc)
+        return []
+
+
+def get_all_codes():
+    """
+    Get ALL pwa_codes (nationwide).
+    Returns list of (pwa_code, name) tuples.
+    """
+    if not _code_to_name:
+        _load_branches()
+    return [(code, name) for code, name in _code_to_name.items()]
+
+
 def reload_cache():
     """Force reload the branch cache."""
     global _branch_cache, _code_to_name

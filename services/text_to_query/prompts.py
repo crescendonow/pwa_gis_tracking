@@ -80,6 +80,7 @@ RULES
 1. READ ONLY: ห้าม INSERT/UPDATE/DELETE/DROP/ALTER/TRUNCATE/CREATE
 2. MongoDB: ใช้เฉพาะ $match, $group, $project, $sort, $limit, $count, $unwind, $geoNear
 3. MongoDB field ต้อง prefix "properties." เช่น "properties.sizeId"
+3b. sizeId เก็บเป็น string — เปรียบเทียบตัวเลขต้องใช้ $expr: {"$expr": {"$gte": [{"$toInt": "$properties.sizeId"}, 100]}}
 4. LIMIT ผลลัพธ์ไม่เกิน 1000 สำหรับ find
 5. วันที่ใช้ ISODate: { "$gte": "2020-01-01T00:00:00Z" }
 6. pwa_code: ใส่ null เสมอ (ระบบ resolve ชื่อสาขาเป็นรหัสให้)
@@ -123,7 +124,7 @@ OUTPUT FORMAT (ตอบเป็น JSON เท่านั้น)
       "pwa_code": null,
       "layer": "pipe",
       "pipeline": [
-        {"$match": {"properties.typeId": "AC", "properties.sizeId": {"$gte": "100"}}},
+        {"$match": {"properties.typeId": "AC", "$expr": {"$gte": [{"$toInt": "$properties.sizeId"}, 100]}}},
         {"$group": {"_id": null, "total_length": {"$sum": {"$toDouble": "$properties.length"}}}},
         {"$project": {"_id": 0, "total_length_km": {"$round": [{"$divide": ["$total_length", 1000]}, 2]}}}
       ],

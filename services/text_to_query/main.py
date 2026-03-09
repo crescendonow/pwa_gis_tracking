@@ -5,6 +5,7 @@ READ-ONLY: absolutely no INSERT, UPDATE, DELETE.
 """
 
 import logging
+import re
 import time
 
 from fastapi import FastAPI, HTTPException, Request
@@ -17,11 +18,11 @@ from starlette.responses import JSONResponse
 
 from config import PORT, RATE_LIMIT, LLM_PROVIDER, GEMINI_MODEL, OLLAMA_MODEL
 from cache import get_cached, set_cached
-from rule_parser import parse_rule
+from rule_parser import parse_rule, parse_followup
 from intent import generate_query_intent
-from branch_resolver import resolve_branch_name, _branch_cache, _code_to_name
+from branch_resolver import resolve_branch_name, get_codes_in_zone, get_all_codes, _branch_cache, _code_to_name
 from validators import validate_sql, validate_mongo_pipeline
-from executors.mongo_executor import execute_mongo
+from executors.mongo_executor import execute_mongo, execute_mongo_multi
 from executors.postgis_executor import execute_postgis
 from formatters import format_response
 
@@ -52,6 +53,38 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# ── Conversation context (follow-up support) ─────────
+# Keyed by pwa_code → last successful query context (5-min TTL)
+_conversation_context = {}
+
+
+def _store_context(pwa_code, query_info, response_type):
+    """Store last successful query context for follow-up queries."""
+    if not pwa_code:
+        return
+    mongo_q = query_info.get("mongo", {})
+    if not mongo_q.get("layer"):
+        return
+    _conversation_context[pwa_code] = {
+        "layer": mongo_q.get("layer", ""),
+        "pwa_code": pwa_code,
+        "pipeline": mongo_q.get("pipeline", []),
+        "operation": mongo_q.get("operation", ""),
+        "response_type": response_type,
+        "timestamp": time.time(),
+    }
+
+
+def _get_context(pwa_code):
+    """Get conversation context (None if expired > 5 min)."""
+    ctx = _conversation_context.get(pwa_code)
+    if ctx and time.time() - ctx["timestamp"] < 300:
+        return ctx
+    if ctx:
+        del _conversation_context[pwa_code]
+    return None
 
 
 # ── Models ───────────────────────────────────────────
@@ -121,15 +154,33 @@ async def text_to_query(req: QueryRequest, request: Request):
     used_rule = False
     if intent is not None:
         rule_name = intent.pop("_rule_matched", "unknown")
+        zone = intent.pop("_zone", None)
+        nationwide = intent.pop("_nationwide", False)
         log.info("Rule-based match [%s] for: %s", rule_name, prompt[:60])
         used_rule = True
     else:
+        zone = None
+        nationwide = False
+
+        # 2b. Follow-up detection: merge with previous context
+        prev_ctx = _get_context(pwa_code) if pwa_code else None
+        if prev_ctx:
+            intent = parse_followup(prompt, prev_ctx)
+            if intent:
+                rule_name = intent.pop("_rule_matched", "followup")
+                zone = intent.pop("_zone", None)
+                nationwide = intent.pop("_nationwide", False)
+                log.info("Follow-up match [%s] for: %s (prev layer=%s)",
+                         rule_name, prompt[:60], prev_ctx.get("layer"))
+                used_rule = True
+
         # 3. LLM → intent + query (fallback)
-        try:
-            intent = await generate_query_intent(prompt, pwa_code)
-        except Exception as exc:
-            log.error("LLM error: %s", exc)
-            raise HTTPException(502, detail="ไม่สามารถเชื่อมต่อ LLM ได้ค่ะ: {}".format(str(exc)))
+        if intent is None:
+            try:
+                intent = await generate_query_intent(prompt, pwa_code)
+            except Exception as exc:
+                log.error("LLM error: %s", exc)
+                raise HTTPException(502, detail="ไม่สามารถเชื่อมต่อ LLM ได้ค่ะ: {}".format(str(exc)))
 
     if intent is None:
         raise HTTPException(
@@ -185,7 +236,27 @@ async def text_to_query(req: QueryRequest, request: Request):
             operation = mongo_q.get("operation", "find")
             code = pwa_code or mongo_q.get("pwa_code", "")
             query_display = {"type": "mongodb", "code": _format_mongo_display(operation, layer, pipeline)}
-            result_data = execute_mongo(code, layer, operation, pipeline, response_type)
+
+            # Nationwide query: aggregate across ALL branches
+            if nationwide:
+                all_branches = get_all_codes()
+                if not all_branches:
+                    raise ValueError("ไม่พบข้อมูลสาขาค่ะ")
+                all_codes = [b[0] for b in all_branches]
+                log.info("Nationwide: querying %d branches", len(all_codes))
+                query_display["code"] += "\n// Nationwide: {} branches".format(len(all_codes))
+                result_data = execute_mongo_multi(all_codes, layer, operation, pipeline, response_type)
+            # Zone query: aggregate across all branches in the zone
+            elif zone:
+                zone_branches = get_codes_in_zone(zone)
+                if not zone_branches:
+                    raise ValueError("ไม่พบสาขาในเขต {} ค่ะ".format(zone))
+                zone_codes = [b[0] for b in zone_branches]
+                log.info("Zone %s: querying %d branches: %s...", zone, len(zone_codes), zone_codes[:5])
+                query_display["code"] += "\n// Zone {}: {} branches".format(zone, len(zone_codes))
+                result_data = execute_mongo_multi(zone_codes, layer, operation, pipeline, response_type)
+            else:
+                result_data = execute_mongo(code, layer, operation, pipeline, response_type)
 
         elif target_db == "both":
             # PostGIS first, then MongoDB
@@ -217,6 +288,32 @@ async def text_to_query(req: QueryRequest, request: Request):
                 if result_data is None:
                     result_data = mongo_result
 
+    except ValueError as exc:
+        # Fallback: if "Collection not found" and "ทั้งหมด" in prompt, retry nationwide
+        if "Collection not found" in str(exc) and re.search(r"ทั้งหมด|ทั้งประเทศ", prompt):
+            log.info("Collection not found, retrying nationwide for: %s", prompt[:60])
+            try:
+                mongo_q = query_info.get("mongo", {})
+                layer = mongo_q.get("layer", "")
+                operation = mongo_q.get("operation", "find")
+                pipeline = mongo_q.get("pipeline", [])
+                all_branches = get_all_codes()
+                all_codes = [b[0] for b in all_branches]
+                result_data = execute_mongo_multi(all_codes, layer, operation, pipeline, response_type)
+                if query_display:
+                    query_display["code"] += "\n// Nationwide fallback: {} branches".format(len(all_codes))
+            except Exception as inner_exc:
+                log.error("Nationwide fallback also failed: %s", inner_exc)
+                raise HTTPException(
+                    500,
+                    detail="เกิดข้อผิดพลาดในการ query ข้อมูลค่ะ: {}".format(str(inner_exc)),
+                )
+        else:
+            log.error("Query execution error: %s", exc)
+            raise HTTPException(
+                500,
+                detail="เกิดข้อผิดพลาดในการ query ข้อมูลค่ะ: {}".format(str(exc)),
+            )
     except Exception as exc:
         log.error("Query execution error: %s", exc)
         raise HTTPException(
@@ -224,8 +321,46 @@ async def text_to_query(req: QueryRequest, request: Request):
             detail="เกิดข้อผิดพลาดในการ query ข้อมูลค่ะ: {}".format(str(exc)),
         )
 
+    # 4b. Fallback: if rule-based result is 0/null/empty, retry with LLM
+    if used_rule and (result_data is None or _is_empty_result(result_data, response_type)):
+        log.info("Rule result empty, falling back to LLM for: %s", prompt[:60])
+        try:
+            llm_intent = await generate_query_intent(prompt, pwa_code)
+            if llm_intent:
+                llm_target = llm_intent.get("target_db", "mongo")
+                llm_qinfo = llm_intent.get("query", {})
+                llm_result = None
+
+                if llm_target == "mongo":
+                    mq = llm_qinfo.get("mongo", {})
+                    llm_code = pwa_code or mq.get("pwa_code", "")
+                    llm_result = execute_mongo(
+                        llm_code, mq.get("layer", ""),
+                        mq.get("operation", "find"), mq.get("pipeline", []),
+                        llm_intent.get("response_type", response_type),
+                    )
+                elif llm_target == "postgis":
+                    llm_sql = llm_qinfo.get("postgis", {}).get("sql", "")
+                    if llm_sql and validate_sql(llm_sql):
+                        llm_result = execute_postgis(llm_sql, llm_intent.get("response_type", response_type))
+
+                if llm_result and not _is_empty_result(llm_result, llm_intent.get("response_type", response_type)):
+                    result_data = llm_result
+                    text_response = llm_intent.get("text_response", text_response)
+                    response_type = llm_intent.get("response_type", response_type)
+                    query_info = llm_qinfo
+                    target_db = llm_target
+                    used_rule = False
+                    log.info("LLM fallback succeeded for: %s", prompt[:60])
+        except Exception as exc:
+            log.warning("LLM fallback failed: %s — keeping rule result", exc)
+
     if result_data is None:
         result_data = {"message": "ไม่พบข้อมูลค่ะ"}
+
+    # 4c. Store context for follow-up queries
+    if result_data and not _is_empty_result(result_data, response_type):
+        _store_context(pwa_code, query_info, response_type)
 
     # 5. Format response
     elapsed_ms = int((time.time() - t0) * 1000)
@@ -247,6 +382,24 @@ async def text_to_query(req: QueryRequest, request: Request):
     set_cached(prompt, pwa_code, response)
 
     return response
+
+
+def _is_empty_result(result_data, response_type):
+    """Check if query result is effectively empty (0, null, no rows, no features)."""
+    if result_data is None:
+        return True
+    if isinstance(result_data, dict):
+        # numeric: value == 0 or None
+        if response_type == "numeric":
+            val = result_data.get("value")
+            return val is None or val == 0 or val == 0.0
+        # table: no rows
+        if response_type == "table":
+            return result_data.get("row_count", 0) == 0 and len(result_data.get("rows", [])) == 0
+        # geojson: no features
+        if response_type == "geojson":
+            return len(result_data.get("features", [])) == 0
+    return False
 
 
 def _format_mongo_display(operation, layer, pipeline):

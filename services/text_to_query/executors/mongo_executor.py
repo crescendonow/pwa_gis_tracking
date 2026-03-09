@@ -206,3 +206,89 @@ def _layer_thai(layer):
 
 def _layer_unit(layer):
     return LAYER_UNIT.get(layer, "รายการ")
+
+
+def execute_mongo_multi(pwa_codes, layer, operation, pipeline, response_type):
+    """
+    Execute a MongoDB aggregate across MULTIPLE branches and combine results.
+    Used for zone-level queries (e.g., "เขต 9" = all branches in zone 9).
+
+    For aggregate (sum/count): sums numeric results across all branches.
+    For find/geojson: merges features from all branches.
+    """
+    if mongo_db is None:
+        raise RuntimeError("MongoDB not connected")
+    if not pwa_codes or not layer:
+        raise ValueError("pwa_codes and layer are required")
+
+    log.info("MongoDB multi-branch: %d branches, layer=%s, op=%s", len(pwa_codes), layer, operation)
+
+    total_value = 0
+    result_label = ""
+    all_features = []
+    all_rows = []
+    all_columns = set()
+    found_count = 0
+    skipped = []
+
+    for code in pwa_codes:
+        try:
+            collection_id = _find_collection_id(code, layer)
+            col_name = "features_{}".format(collection_id)
+            collection = mongo_db[col_name]
+        except (ValueError, Exception) as exc:
+            log.warning("Skip branch %s: %s", code, exc)
+            skipped.append(code)
+            continue
+
+        found_count += 1
+
+        if operation == "count":
+            filt = pipeline[0] if pipeline else {}
+            count = collection.count_documents(filt)
+            total_value += count
+
+        elif operation == "aggregate":
+            cursor = collection.aggregate(pipeline)
+            rows = list(cursor)
+            if rows:
+                row = rows[0]
+                for key, val in row.items():
+                    if key != "_id" and isinstance(val, (int, float)):
+                        total_value += val
+                        result_label = key
+
+        elif operation == "find":
+            filt = pipeline[0] if pipeline else {}
+            docs = list(collection.find(filt).limit(200))
+            if response_type == "geojson":
+                for doc in docs:
+                    geom = doc.get("geometry")
+                    if not geom:
+                        continue
+                    props = {k: _safe_val(v) for k, v in doc.get("properties", {}).items()}
+                    all_features.append({"type": "Feature", "geometry": geom, "properties": props})
+            elif response_type == "table":
+                for doc in docs:
+                    props = doc.get("properties", {})
+                    row = {k: _safe_val(v) for k, v in props.items()}
+                    all_rows.append(row)
+                    all_columns.update(props.keys())
+
+    if skipped:
+        log.info("Skipped %d branches (no collection): %s", len(skipped), skipped[:5])
+
+    if operation in ("count", "aggregate"):
+        return {
+            "value": round(total_value, 2) if isinstance(total_value, float) else total_value,
+            "label": result_label or "จำนวน {} รวม".format(_layer_thai(layer)),
+            "unit": _layer_unit(layer) if operation == "count" else "",
+            "_branches_found": found_count,
+            "_branches_skipped": len(skipped),
+        }
+    elif response_type == "geojson":
+        return {"type": "FeatureCollection", "features": all_features}
+    elif response_type == "table":
+        return {"columns": sorted(all_columns), "rows": all_rows[:500], "row_count": len(all_rows)}
+
+    return {"value": 0, "label": "ไม่พบข้อมูล", "unit": ""}

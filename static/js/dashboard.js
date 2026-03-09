@@ -429,22 +429,52 @@ function renderStats(data) {
 
     // Compute pipe length totals across all branches
     var totalPipeLongM = 0;
-    (data.branches || []).forEach(function(b) { totalPipeLongM += b.pipe_long || 0; });
+    var totalPipeLongExSleeveM = 0;
+    var totalActiveMeter = 0;
+    (data.branches || []).forEach(function(b) {
+        totalPipeLongM += b.pipe_long || 0;
+        totalPipeLongExSleeveM += b.pipe_long_ex_sleeve || 0;
+        totalActiveMeter += b.active_meter || 0;
+    });
     var totalPipeLongKm = totalPipeLongM / 1000;
+    var totalPipeLongExSleeveKm = totalPipeLongExSleeveM / 1000;
 
     // Get specific layer counts from grand total
     var firehydrantCount = gt.firehydrant || 0;
     var valveCount = gt.valve || 0;
+    var totalMeter = gt.meter || 0;
+
+    // Pipe length card: show ex-sleeve / total, fallback to total only if ex-sleeve not available
+    var pipeLabel, pipeValue, pipeSuffix;
+    if (totalPipeLongExSleeveM > 0) {
+        pipeLabel = 'ความยาวไม่รวมท่อปลอก (กม.)';
+        pipeValue = formatDecimal(totalPipeLongExSleeveKm);
+        pipeSuffix = '/ ทั้งหมด ' + formatDecimal(totalPipeLongKm) + ' กม.';
+    } else {
+        pipeLabel = 'ความยาวท่อรวม (กม.)';
+        pipeValue = formatDecimal(totalPipeLongKm);
+        pipeSuffix = '';
+    }
+
+    // Meter card: show active / total, fallback to total only if active not available
+    var meterLabel = 'มาตรวัดน้ำ';
+    var meterValue, meterSuffix;
+    if (totalActiveMeter > 0) {
+        meterValue = formatNumber(totalActiveMeter);
+        meterSuffix = '/ ทั้งหมด ' + formatNumber(totalMeter);
+    } else {
+        meterValue = formatNumber(totalMeter);
+        meterSuffix = '';
+    }
 
     var stats = [
         { label: 'สาขาทั้งหมด', value: formatNumber(totalBranches), color: 'blue', suffix: 'สาขา' },
         { label: 'ปริมาณข้อมูลทั้งหมด (features)', value: formatNumber(totalFeatures), color: 'gold', suffix: '' },
         { label: 'เขต', value: data.zone_names ? data.zone_names.length : 0, color: 'green', suffix: 'เขต' },
-        { label: 'ความยาวท่อรวม (ม.)', value: formatDecimal(totalPipeLongM), color: 'cyan', suffix: '' },
-        { label: 'ความยาวท่อรวม (กม.)', value: formatDecimal(totalPipeLongKm), color: 'cyan', suffix: '' },
+        { label: pipeLabel, value: pipeValue, color: 'cyan', suffix: pipeSuffix },
         { label: 'หัวดับเพลิง', value: formatNumber(firehydrantCount), color: 'blue', suffix: 'records' },
         { label: 'ประตูน้ำ', value: formatNumber(valveCount), color: 'green', suffix: 'records' },
-        { label: 'มาตรวัดน้ำ', value: formatNumber(gt.meter || 0), color: 'blue', suffix: 'records' }
+        { label: meterLabel, value: meterValue, color: 'blue', suffix: meterSuffix }
     ];
 
     container.innerHTML = stats.map(function(s, i) {

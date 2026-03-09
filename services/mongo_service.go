@@ -391,6 +391,80 @@ func SumPipeLength(pwaCode string, startDate, endDate string) (float64, error) {
 	return 0, nil
 }
 
+// SumPipeLengthExcludingSleeve aggregates pipe length excluding ท่อปลอก (functionId != "6").
+func SumPipeLengthExcludingSleeve(pwaCode string, startDate, endDate string) (float64, error) {
+	collectionID, err := FindCollectionID(pwaCode, "pipe")
+	if err != nil {
+		return 0, nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	featuresCol := config.GetMongoCollection(fmt.Sprintf("features_%s", collectionID))
+	// Handle both string and int types for functionId — exclude ท่อปลอก (functionId = 6)
+	sleeveFilter := bson.M{
+		"properties.functionId": bson.M{"$nin": []interface{}{"6", 6}},
+	}
+	filter := sleeveFilter
+	if startDate != "" || endDate != "" {
+		dateFilter := buildDateFilter("properties.recordDate", startDate, endDate)
+		if dateFilter != nil {
+			filter = bson.M{
+				"$and": []bson.M{
+					sleeveFilter,
+					dateFilter,
+				},
+			}
+		}
+	}
+
+	fieldNames := []string{"length", "PIPE_LONG", "pipe_long", "pipeLength", "PIPE_LEN", "pipe_len"}
+	for _, fieldName := range fieldNames {
+		total := sumFieldAsDouble(ctx, featuresCol, filter, "properties."+fieldName)
+		if total > 0 {
+			return total, nil
+		}
+	}
+
+	return 0, nil
+}
+
+// CountActiveMeters counts meters with custStat IN ('1','2','3','4') — excludes ยกเลิกถาวร.
+func CountActiveMeters(pwaCode string, startDate, endDate string) (int64, error) {
+	collectionID, err := FindCollectionID(pwaCode, "meter")
+	if err != nil {
+		return 0, nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	featuresCol := config.GetMongoCollection(fmt.Sprintf("features_%s", collectionID))
+	// Handle both string and int types for custStat
+	custStatFilter := bson.M{
+		"properties.custStat": bson.M{"$in": []interface{}{"1", "2", "3", "4", 1, 2, 3, 4}},
+	}
+	filter := custStatFilter
+	if startDate != "" || endDate != "" {
+		dateFilter := buildDateFilter("properties.recordDate", startDate, endDate)
+		if dateFilter != nil {
+			filter = bson.M{
+				"$and": []bson.M{
+					custStatFilter,
+					dateFilter,
+				},
+			}
+		}
+	}
+
+	count, err := featuresCol.CountDocuments(ctx, filter)
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
 // sumFieldAsDouble aggregates $sum on a field, converting string values to double.
 func sumFieldAsDouble(ctx context.Context, col *mongo.Collection, filter bson.M, field string) float64 {
 	pipeline := []bson.M{

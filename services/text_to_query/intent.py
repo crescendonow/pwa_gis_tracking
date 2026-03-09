@@ -3,6 +3,7 @@ LLM integration — call Cloud LLM API and parse structured JSON intent.
 Supports: Gemini Flash (primary), with Ollama as optional fallback.
 """
 
+import asyncio
 import json
 import logging
 import re
@@ -78,21 +79,32 @@ async def _call_gemini(messages, timeout=None):
         GEMINI_MODEL, GEMINI_API_KEY
     )
 
-    async with httpx.AsyncClient(timeout=timeout) as client:
-        resp = await client.post(url, json=body)
-        resp.raise_for_status()
-        data = resp.json()
+    max_retries = 3
+    for attempt in range(max_retries):
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            resp = await client.post(url, json=body)
 
-    # Extract text from response
-    candidates = data.get("candidates", [])
-    if not candidates:
-        raise RuntimeError("Gemini returned no candidates")
+            if resp.status_code == 429 and attempt < max_retries - 1:
+                wait = 2 ** attempt  # 1s, 2s
+                log.warning("Gemini 429 rate limited, retry in %ds (attempt %d/%d)", wait, attempt + 1, max_retries)
+                await asyncio.sleep(wait)
+                continue
 
-    parts = candidates[0].get("content", {}).get("parts", [])
-    if not parts:
-        raise RuntimeError("Gemini returned no content parts")
+            resp.raise_for_status()
+            data = resp.json()
 
-    return parts[0].get("text", "")
+        # Extract text from response
+        candidates = data.get("candidates", [])
+        if not candidates:
+            raise RuntimeError("Gemini returned no candidates")
+
+        parts = candidates[0].get("content", {}).get("parts", [])
+        if not parts:
+            raise RuntimeError("Gemini returned no content parts")
+
+        return parts[0].get("text", "")
+
+    raise RuntimeError("Gemini rate limited after {} retries".format(max_retries))
 
 
 # ── Ollama (fallback) ─────────────────────────────────────
