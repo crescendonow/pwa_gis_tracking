@@ -444,6 +444,7 @@ func CountActiveMeters(pwaCode string, startDate, endDate string) (int64, error)
 	// Handle both string and int types for custStat
 	custStatFilter := bson.M{
 		"properties.custStat": bson.M{"$in": []interface{}{"1", "2", "3", "4", 1, 2, 3, 4}},
+		"properties.validate": bson.M{"$in": []interface{}{1, "1"}},
 	}
 	filter := custStatFilter
 	if startDate != "" || endDate != "" {

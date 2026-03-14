@@ -415,13 +415,26 @@ func buildFlatGeobuf(features []fgbFeature, columns []fgbColumn, geomType byte, 
 	}
 	buf.Write(headerBytes)
 
-	// 4. Build and write each feature
+	// 4. Pad to 8-byte alignment before features section
+	for buf.Len()%8 != 0 {
+		buf.WriteByte(0)
+	}
+
+	// 5. Build and write each feature (size-prefixed, 8-byte aligned)
 	for _, f := range features {
 		featureBytes := buildFGBFeature(f, columns)
+		// Pad feature to 8-byte boundary so Float64Array alignment is correct
+		for len(featureBytes)%8 != 0 {
+			featureBytes = append(featureBytes, 0)
+		}
 		if err := binary.Write(&buf, binary.LittleEndian, uint32(len(featureBytes))); err != nil {
 			return nil, err
 		}
 		buf.Write(featureBytes)
+		// Pad after each feature+prefix to maintain 8-byte alignment
+		for buf.Len()%8 != 0 {
+			buf.WriteByte(0)
+		}
 	}
 
 	return buf.Bytes(), nil

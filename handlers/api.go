@@ -67,6 +67,17 @@ func GetOfficesWithGeom(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "success", "data": offices, "count": len(offices)})
 }
 
+// GetZoneCenters returns zone center coordinates from PostGIS.
+// GET /api/zones/centers
+func GetZoneCenters(c *gin.Context) {
+	centers, err := services.GetZoneCenters()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "success", "data": centers})
+}
+
 // GetYears returns available years for date filtering.
 // GET /api/years
 func GetYears(c *gin.Context) {
@@ -732,14 +743,29 @@ func GetFeaturesForMap(c *gin.Context) {
 		return
 	}
 
-	data, err := services.ExportFeaturesForMap(pwaCode, collection, startDate, endDate)
+	geojsonData, err := services.ExportFeaturesForMap(pwaCode, collection, startDate, endDate)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.Header("Content-Type", "application/geo+json")
-	c.Data(http.StatusOK, "application/geo+json", data)
+	// Return FlatGeobuf by default, GeoJSON if ?format=geojson
+	format := c.DefaultQuery("format", "fgb")
+	if format == "geojson" {
+		c.Header("Content-Type", "application/geo+json")
+		c.Data(http.StatusOK, "application/geo+json", geojsonData)
+		return
+	}
+
+	fgbData, fgbErr := services.ExportMergedAsFlatGeobuf(geojsonData, collection)
+	if fgbErr != nil {
+		// Fallback to GeoJSON on conversion error
+		c.Header("Content-Type", "application/geo+json")
+		c.Data(http.StatusOK, "application/geo+json", geojsonData)
+		return
+	}
+	c.Header("Content-Type", "application/flatgeobuf")
+	c.Data(http.StatusOK, "application/flatgeobuf", fgbData)
 }
 
 // GetFeatureProps returns full properties for a single feature (lazy-loaded on map click).

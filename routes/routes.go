@@ -48,6 +48,7 @@ func RegisterRoutes(router *gin.Engine) {
 		api := base.Group("/api", handlers.AuditLogMiddleware())
 		{
 			api.GET("/zones", handlers.GetZones)
+			api.GET("/zones/centers", handlers.GetZoneCenters)
 			api.GET("/offices", handlers.GetOffices)
 			api.GET("/offices/geom", handlers.GetOfficesWithGeom)
 			api.GET("/years", handlers.GetYears)

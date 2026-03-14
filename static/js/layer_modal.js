@@ -218,7 +218,9 @@ var LayerModal = (function() {
             '.lm-table-wrap{flex:1;overflow:auto}',
             '.lm-table{width:100%;border-collapse:collapse;font-size:12px}',
             '.lm-table thead{position:sticky;top:0;z-index:2}',
-            '.lm-table th{background:var(--surface-2,#F6F6F6);color:var(--text-secondary,#4A4A4A);padding:8px 10px;text-align:left;font-weight:700;font-size:11px;white-space:nowrap;border-bottom:2px solid var(--pwa-blue,#3F74CA);letter-spacing:.3px}',
+            '.lm-table th{background:var(--surface-2,#F6F6F6);color:var(--text-secondary,#4A4A4A);padding:8px 10px;text-align:left;font-weight:700;font-size:11px;white-space:nowrap;border-bottom:2px solid var(--pwa-blue,#3F74CA);letter-spacing:.3px;position:relative;user-select:none}',
+            '.lm-resize-handle{position:absolute;right:0;top:0;bottom:0;width:5px;cursor:col-resize;z-index:3}',
+            '.lm-resize-handle:hover,.lm-resize-handle.active{background:var(--pwa-blue,#3F74CA)}',
             '.lm-table td{padding:6px 10px;border-bottom:1px solid var(--border,rgba(0,0,0,0.06));color:var(--text-primary,#1A1A1A);white-space:nowrap;max-width:280px;overflow:hidden;text-overflow:ellipsis}',
             '.lm-table tr:hover td{background:rgba(63,116,202,0.04)}',
             '.lm-table td.num{text-align:right;font-variant-numeric:tabular-nums}',
@@ -456,9 +458,10 @@ var LayerModal = (function() {
                     arrow = state.sortOrder === 'asc' ? ' \u25B2' : ' \u25BC';
                 }
                 hh += '<th class="lm-sortable" data-field="' + esc(colKey) + '">' +
-                      esc(colKey) + '<span class="lm-sort-arrow">' + arrow + '</span></th>';
+                      esc(colKey) + '<span class="lm-sort-arrow">' + arrow + '</span>' +
+                      '<div class="lm-resize-handle"></div></th>';
             } else {
-                hh += '<th>' + esc(colKey) + '</th>';
+                hh += '<th>' + esc(colKey) + '<div class="lm-resize-handle"></div></th>';
             }
         }
         hh += '</tr>';
@@ -468,6 +471,12 @@ var LayerModal = (function() {
         var sortHeaders = thead.querySelectorAll('.lm-sortable');
         for (var si = 0; si < sortHeaders.length; si++) {
             sortHeaders[si].addEventListener('click', _onSortClick);
+        }
+
+        // Attach column resize handlers
+        var resizeHandles = thead.querySelectorAll('.lm-resize-handle');
+        for (var ri = 0; ri < resizeHandles.length; ri++) {
+            resizeHandles[ri].addEventListener('mousedown', _onResizeStart);
         }
 
         // Rows
@@ -811,7 +820,32 @@ var LayerModal = (function() {
     // ==========================================
     // Sort Helpers
     // ==========================================
+    function _onResizeStart(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        var handle = e.currentTarget;
+        var th = handle.parentElement;
+        var startX = e.clientX;
+        var startW = th.offsetWidth;
+        handle.classList.add('active');
+
+        function onMove(ev) {
+            var newW = Math.max(40, startW + (ev.clientX - startX));
+            th.style.width = newW + 'px';
+            th.style.minWidth = newW + 'px';
+        }
+        function onUp() {
+            handle.classList.remove('active');
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onUp);
+        }
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+    }
+
     function _onSortClick(e) {
+        // Ignore clicks from resize handle
+        if (e.target.classList.contains('lm-resize-handle')) return;
         var th = e.currentTarget;
         var field = th.getAttribute('data-field');
         if (state.sortField === field) {

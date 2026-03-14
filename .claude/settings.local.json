@@ -12,7 +12,8 @@
       "Bash(go vet ./handlers/ ./services/)",
       "Bash(xargs grep -l \"grid\\\\|table\\\\|datagrid\")",
       "Bash(wc -l services/*.go handlers/*.go)",
-      "Bash(go build ./...)"
+      "Bash(go build ./...)",
+      "WebFetch(domain:cdn.jsdelivr.net)"
     ]
   }
 }

@@ -19,8 +19,13 @@ func AdvancedQuery(c *gin.Context) {
 		return
 	}
 
-	if req.PwaCode == "" || req.Collection == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "pwaCode and collection are required"})
+	// Require at least one pwa code
+	if req.PwaCode == "" && len(req.PwaCodes) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "pwaCode or pwaCodes is required"})
+		return
+	}
+	if req.Collection == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "collection is required"})
 		return
 	}
 
@@ -80,8 +85,12 @@ func AdvancedQueryExport(c *gin.Context) {
 		return
 	}
 
-	if req.PwaCode == "" || req.Collection == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "pwaCode and collection are required"})
+	if req.PwaCode == "" && len(req.PwaCodes) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "pwaCode or pwaCodes is required"})
+		return
+	}
+	if req.Collection == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "collection is required"})
 		return
 	}
 

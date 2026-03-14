@@ -19,6 +19,7 @@ var AdvancedQuery = (function () {
   // ═══════════════════════════════════════════════
   var state = {
     pwaCode: "",
+    pwaCodes: [],       // multiple branches
     collection: "",
     availableLayers: [],
     startDate: "",
@@ -40,6 +41,8 @@ var AdvancedQuery = (function () {
     loading: false,
     suggestTimer: null,
     executed: false,
+    viewMode: "table",  // "table" or "map"
+    mapInstance: null,
   };
 
   var modalEl = null;
@@ -109,6 +112,7 @@ var AdvancedQuery = (function () {
       '      <span class="aq-badge" id="aqBadge">0</span>' +
       "    </div>" +
       '    <div class="aq-header-right">' +
+      '      <div id="aqBranchTags" class="aq-branch-tags"></div>' +
       '      <select id="aqTemplateSelect" class="aq-template-select" title="โหลด Template">' +
       '        <option value="">-- Template --</option>' +
       "      </select>" +
@@ -139,6 +143,12 @@ var AdvancedQuery = (function () {
       '  <div class="aq-results" id="aqResultsSection" style="display:none">' +
       '    <div class="aq-grid-toolbar" id="aqGridToolbar">' +
       '      <span id="aqTotalInfo" class="aq-total-info"></span>' +
+      '      <div class="aq-view-toggle">' +
+      '        <button class="aq-btn aq-btn-xs aq-view-btn active" id="aqViewTable" onclick="AdvancedQuery._setView(\'table\')">' +
+      '          <i class="fa-solid fa-table"></i> Table</button>' +
+      '        <button class="aq-btn aq-btn-xs aq-view-btn" id="aqViewMap" onclick="AdvancedQuery._setView(\'map\')">' +
+      '          <i class="fa-solid fa-map"></i> Map</button>' +
+      "      </div>" +
       '      <div class="aq-export-btns">' +
       '        <span class="aq-export-label">Export:</span>' +
       '        <button class="aq-btn aq-btn-xs" onclick="AdvancedQuery._export(\'csv\')">CSV</button>' +
@@ -150,6 +160,7 @@ var AdvancedQuery = (function () {
       "      </div>" +
       "    </div>" +
       '    <div id="aqGrid" class="aq-grid ag-theme-alpine-dark"></div>' +
+      '    <div id="aqMapContainer" class="aq-map-container" style="display:none"></div>' +
       '    <div class="aq-footer">' +
       '      <span id="aqPageInfo" class="aq-page-info"></span>' +
       '      <div class="aq-page-btns">' +
@@ -210,6 +221,7 @@ var AdvancedQuery = (function () {
     ensureModal();
 
     state.pwaCode = opts.pwaCode || "";
+    state.pwaCodes = opts.pwaCodes || (opts.pwaCode ? [opts.pwaCode] : []);
     state.collection = opts.collection || "";
     state.availableLayers = opts.availableLayers || [opts.collection];
     state.startDate = opts.startDate || "";
@@ -223,6 +235,7 @@ var AdvancedQuery = (function () {
     state.sortBy = "";
     state.sortOrder = "desc";
     state.gridApi = null;
+    state.viewMode = "table";
 
     // Reset conditions
     state.conditions = newGroup("AND");
@@ -249,6 +262,9 @@ var AdvancedQuery = (function () {
       if (lyr === state.collection) opt.selected = true;
       colSelect.appendChild(opt);
     }
+
+    // Render branch tags
+    renderBranchTags();
 
     // Reset UI
     document.getElementById("aqResultsSection").style.display = "none";
@@ -791,6 +807,7 @@ var AdvancedQuery = (function () {
 
     var body = {
       pwaCode: state.pwaCode,
+      pwaCodes: state.pwaCodes,
       collection: state.collection,
       conditions: conditions,
       page: state.page,
@@ -830,7 +847,8 @@ var AdvancedQuery = (function () {
         document.getElementById("aqBadge").textContent = fmtNum(state.total);
         document.getElementById("aqResultsSection").style.display = "";
 
-        updateGrid();
+        // Delay grid creation to ensure container has reflowed after display change
+        setTimeout(function() { updateGrid(); }, 50);
         updateFooter();
       })
       .catch(function (err) {
@@ -847,96 +865,101 @@ var AdvancedQuery = (function () {
     if (!gridDiv) return;
 
     // Build column definitions from API columns
-    var colDefs = [];
     var cols = state.columns || [];
 
-    // Row number column
-    colDefs.push({
-      headerName: "#",
-      valueGetter: function (params) {
-        return (state.page - 1) * state.pageSize + params.node.rowIndex + 1;
-      },
-      width: 60,
-      pinned: "left",
-      sortable: false,
-      suppressSizeToFit: true,
-    });
-
-    for (var i = 0; i < cols.length; i++) {
-      var col = cols[i];
-      if (col.key === "_doc_id" || col.key === "password") continue;
-      colDefs.push({
-        headerName: col.key,
-        field: col.key,
-        sortable: true,
-        resizable: true,
-        filter: false,
-        minWidth: 80,
-        tooltipField: col.key,
-      });
-    }
-
-    // If columns are empty, derive from data
-    if (colDefs.length <= 1 && state.results.length > 0) {
-      var keys = Object.keys(state.results[0]).sort();
-      for (var k = 0; k < keys.length; k++) {
-        if (keys[k] === "_doc_id" || keys[k] === "password") continue;
-        colDefs.push({
-          headerName: keys[k],
-          field: keys[k],
-          sortable: true,
-          resizable: true,
-          filter: false,
-          minWidth: 80,
-        });
+    // If columns empty, derive from data keys
+    if (cols.length === 0 && state.results.length > 0) {
+      var derivedKeys = Object.keys(state.results[0]).sort();
+      cols = [];
+      for (var dk = 0; dk < derivedKeys.length; dk++) {
+        if (derivedKeys[dk] === "_doc_id" || derivedKeys[dk] === "password") continue;
+        cols.push({ key: derivedKeys[dk], mongo_key: derivedKeys[dk] });
       }
+      state.columns = cols;
     }
 
-    var gridOptions = {
-      columnDefs: colDefs,
-      rowData: state.results,
-      defaultColDef: {
-        sortable: true,
-        resizable: true,
-        filter: false,
-        minWidth: 70,
-      },
-      animateRows: true,
-      suppressPaginationPanel: true,
-      domLayout: "normal",
-      onSortChanged: function (event) {
-        // Server-side sort
-        var sortModel = event.api.getColumnState
-          ? event.api
-              .getColumnState()
-              .filter(function (c) {
-                return c.sort;
-              })
-          : [];
-        if (sortModel.length > 0) {
-          // Reverse-lookup to get MongoDB field name
-          var sortKey = sortModel[0].colId;
-          if (state.reverseMapping && state.reverseMapping[sortKey]) {
-            state.sortBy = state.reverseMapping[sortKey];
-          } else {
-            state.sortBy = sortKey;
-          }
-          state.sortOrder = sortModel[0].sort; // "asc" or "desc"
-          state.page = 1;
-          _doExecute();
-        }
-      },
-    };
-
-    // Destroy existing grid and create new one
+    // Destroy existing grid — if AG Grid API exists, destroy properly
+    if (state.gridApi && typeof state.gridApi.destroy === "function") {
+      try { state.gridApi.destroy(); } catch (ignored) {}
+    }
+    state.gridApi = null;
     gridDiv.innerHTML = "";
 
-    if (typeof agGrid !== "undefined" && agGrid.createGrid) {
-      state.gridApi = agGrid.createGrid(gridDiv, gridOptions);
+    // Try AG Grid first
+    if (typeof agGrid !== "undefined" && typeof agGrid.createGrid === "function") {
+      try {
+        var colDefs = [];
+        // Row number column
+        colDefs.push({
+          headerName: "#",
+          valueGetter: function (params) {
+            return (state.page - 1) * state.pageSize + params.node.rowIndex + 1;
+          },
+          width: 60,
+          pinned: "left",
+          sortable: false,
+          suppressSizeToFit: true,
+        });
+
+        for (var i = 0; i < cols.length; i++) {
+          if (cols[i].key === "_doc_id" || cols[i].key === "password") continue;
+          colDefs.push({
+            headerName: cols[i].key,
+            field: cols[i].key,
+            sortable: true,
+            resizable: true,
+            filter: false,
+            minWidth: 80,
+            tooltipField: cols[i].key,
+          });
+        }
+
+        var gridOptions = {
+          columnDefs: colDefs,
+          rowData: state.results,
+          defaultColDef: {
+            sortable: true,
+            resizable: true,
+            filter: false,
+            minWidth: 70,
+          },
+          animateRows: false,
+          suppressPaginationPanel: true,
+          domLayout: "autoHeight",
+          onSortChanged: function (event) {
+            var sortModel = event.api.getColumnState
+              ? event.api.getColumnState().filter(function (c) { return c.sort; })
+              : [];
+            if (sortModel.length > 0) {
+              var sortKey = sortModel[0].colId;
+              if (state.reverseMapping && state.reverseMapping[sortKey]) {
+                state.sortBy = state.reverseMapping[sortKey];
+              } else {
+                state.sortBy = sortKey;
+              }
+              state.sortOrder = sortModel[0].sort;
+              state.page = 1;
+              _doExecute();
+            }
+          },
+          onGridReady: function (params) {
+            params.api.sizeColumnsToFit();
+            console.log("[AQ] AG Grid ready, rows rendered:", state.results.length);
+          },
+        };
+
+        state.gridApi = agGrid.createGrid(gridDiv, gridOptions);
+        console.log("[AQ] AG Grid created:", state.results.length, "rows");
+        return;
+      } catch (e) {
+        console.warn("[AQ] AG Grid failed, using fallback table:", e);
+      }
     } else {
-      // Fallback: render simple HTML table if AG Grid not loaded
-      renderFallbackTable(gridDiv);
+      console.log("[AQ] AG Grid not available, using fallback table");
     }
+
+    // Fallback: HTML table
+    renderFallbackTable(gridDiv);
   }
 
   function renderFallbackTable(container) {
@@ -1018,6 +1041,7 @@ var AdvancedQuery = (function () {
 
     var body = {
       pwaCode: state.pwaCode,
+      pwaCodes: state.pwaCodes,
       collection: state.collection,
       conditions: conditions,
       limit: state.limit,
@@ -1179,6 +1203,195 @@ var AdvancedQuery = (function () {
   }
 
   // ═══════════════════════════════════════════════
+  // Branch Tags (multi-branch display)
+  // ═══════════════════════════════════════════════
+  function renderBranchTags() {
+    var container = document.getElementById("aqBranchTags");
+    if (!container) return;
+    var codes = state.pwaCodes || [];
+    if (codes.length <= 1) {
+      container.innerHTML =
+        '<span class="aq-branch-tag">' +
+        '<i class="fa-solid fa-store"></i> ' + esc(codes[0] || state.pwaCode) +
+        "</span>";
+      return;
+    }
+    var html = "";
+    for (var i = 0; i < codes.length; i++) {
+      html +=
+        '<span class="aq-branch-tag">' +
+        '<i class="fa-solid fa-store"></i> ' + esc(codes[i]) +
+        "</span>";
+    }
+    html += '<span class="aq-branch-count">' + codes.length + " สาขา</span>";
+    container.innerHTML = html;
+  }
+
+  // ═══════════════════════════════════════════════
+  // View Toggle (Table / Map)
+  // ═══════════════════════════════════════════════
+  function setView(mode) {
+    state.viewMode = mode;
+    var gridEl = document.getElementById("aqGrid");
+    var mapEl = document.getElementById("aqMapContainer");
+    var tableBtn = document.getElementById("aqViewTable");
+    var mapBtn = document.getElementById("aqViewMap");
+    var footerEl = gridEl ? gridEl.closest(".aq-results").querySelector(".aq-footer") : null;
+
+    if (mode === "map") {
+      if (gridEl) gridEl.style.display = "none";
+      if (mapEl) mapEl.style.display = "";
+      if (tableBtn) tableBtn.classList.remove("active");
+      if (mapBtn) mapBtn.classList.add("active");
+      if (footerEl) footerEl.style.display = "none";
+      renderMap();
+    } else {
+      if (gridEl) gridEl.style.display = "";
+      if (mapEl) mapEl.style.display = "none";
+      if (tableBtn) tableBtn.classList.add("active");
+      if (mapBtn) mapBtn.classList.remove("active");
+      if (footerEl) footerEl.style.display = "";
+    }
+  }
+
+  function renderMap() {
+    var mapEl = document.getElementById("aqMapContainer");
+    if (!mapEl || typeof maplibregl === "undefined") {
+      mapEl.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-muted);">MapLibre GL JS not available</div>';
+      return;
+    }
+
+    // Create or reuse map
+    if (!state.mapInstance) {
+      mapEl.innerHTML = "";
+      state.mapInstance = new maplibregl.Map({
+        container: mapEl,
+        style: {
+          version: 8,
+          sources: {
+            osm: {
+              type: "raster",
+              tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+              tileSize: 256,
+            },
+          },
+          layers: [
+            { id: "osm", type: "raster", source: "osm", paint: { "raster-opacity": 0.55 } },
+          ],
+        },
+        center: [100.5, 13.7],
+        zoom: 7,
+        attributionControl: false,
+      });
+      state.mapInstance.addControl(new maplibregl.NavigationControl(), "top-right");
+    }
+
+    // Fetch GeoJSON for map
+    setLoading(true);
+    var conditions = serializeConditions(state.conditions);
+    var body = {
+      pwaCode: state.pwaCode,
+      pwaCodes: state.pwaCodes,
+      collection: state.collection,
+      conditions: conditions,
+      limit: state.limit,
+      format: "geojson",
+    };
+    if (state.startDate) body.startDate = state.startDate;
+    if (state.endDate) body.endDate = state.endDate;
+
+    fetch(BASE + "/api/features/advanced-query/export", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify(body),
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (geojson) {
+        setLoading(false);
+        if (!geojson || !geojson.features) return;
+
+        var map = state.mapInstance;
+
+        // Remove old layer/source
+        if (map.getLayer("aq-features-layer")) map.removeLayer("aq-features-layer");
+        if (map.getLayer("aq-features-points")) map.removeLayer("aq-features-points");
+        if (map.getSource("aq-features")) map.removeSource("aq-features");
+
+        // Add source
+        map.addSource("aq-features", { type: "geojson", data: geojson });
+
+        // Determine geometry type from first feature
+        var geomType = "";
+        if (geojson.features.length > 0 && geojson.features[0].geometry) {
+          geomType = geojson.features[0].geometry.type || "";
+        }
+
+        if (geomType.indexOf("Polygon") >= 0) {
+          map.addLayer({
+            id: "aq-features-layer", type: "fill", source: "aq-features",
+            paint: { "fill-color": "#3498DB", "fill-opacity": 0.4, "fill-outline-color": "#2980B9" },
+          });
+        } else if (geomType.indexOf("Line") >= 0) {
+          map.addLayer({
+            id: "aq-features-layer", type: "line", source: "aq-features",
+            paint: { "line-color": "#E74C3C", "line-width": 2 },
+          });
+        } else {
+          map.addLayer({
+            id: "aq-features-points", type: "circle", source: "aq-features",
+            paint: { "circle-radius": 5, "circle-color": "#3498DB", "circle-stroke-width": 1, "circle-stroke-color": "#fff" },
+          });
+        }
+
+        // Fit bounds
+        if (geojson.features.length > 0) {
+          var bounds = new maplibregl.LngLatBounds();
+          geojson.features.forEach(function (f) {
+            if (!f.geometry || !f.geometry.coordinates) return;
+            addCoordsToBounds(bounds, f.geometry.coordinates);
+          });
+          if (!bounds.isEmpty()) {
+            map.fitBounds(bounds, { padding: 40, maxZoom: 16 });
+          }
+        }
+
+        // Popup on click
+        var clickLayer = map.getLayer("aq-features-layer") ? "aq-features-layer" : "aq-features-points";
+        map.on("click", clickLayer, function (e) {
+          if (!e.features || !e.features[0]) return;
+          var props = e.features[0].properties || {};
+          var html = '<div style="max-height:200px;overflow-y:auto;font-size:12px;font-family:\'Noto Sans Thai\',sans-serif;">';
+          for (var k in props) {
+            if (k === "_id" || k === "password") continue;
+            html += "<div><strong>" + esc(k) + ":</strong> " + esc(String(props[k])) + "</div>";
+          }
+          html += "</div>";
+          new maplibregl.Popup({ maxWidth: "320px" })
+            .setLngLat(e.lngLat)
+            .setHTML(html)
+            .addTo(map);
+        });
+        map.on("mouseenter", clickLayer, function () { map.getCanvas().style.cursor = "pointer"; });
+        map.on("mouseleave", clickLayer, function () { map.getCanvas().style.cursor = ""; });
+      })
+      .catch(function (err) {
+        setLoading(false);
+        console.error("[AQ] Map load error:", err);
+      });
+  }
+
+  function addCoordsToBounds(bounds, coords) {
+    if (typeof coords[0] === "number") {
+      bounds.extend(coords);
+    } else {
+      for (var i = 0; i < coords.length; i++) {
+        addCoordsToBounds(bounds, coords[i]);
+      }
+    }
+  }
+
+  // ═══════════════════════════════════════════════
   // Helpers
   // ═══════════════════════════════════════════════
   function setLoading(on) {
@@ -1214,5 +1427,6 @@ var AdvancedQuery = (function () {
     _prevPage: prevPage,
     _nextPage: nextPage,
     _lastPage: lastPage,
+    _setView: setView,
   };
 })();

@@ -174,6 +174,97 @@ func getAllOfficesWithGeomFallback() ([]models.PwaOffice, error) {
 	return offices, nil
 }
 
+// GetZoneCenters retrieves zone center coordinates.
+// Tries pwa_office.zone table first; falls back to computing centroids
+// from pwa_office.pwa_office234 (average of branch office positions per zone).
+func GetZoneCenters() ([]models.ZoneCenter, error) {
+	// Primary: dedicated zone table
+	centers, err := getZoneCentersFromTable()
+	if err == nil && len(centers) > 0 {
+		return centers, nil
+	}
+	if err != nil {
+		log.Printf("zone table query failed, using fallback: %v", err)
+	}
+
+	// Fallback: compute zone centroids from office coordinates
+	return getZoneCentersFromOffices()
+}
+
+func getZoneCentersFromTable() ([]models.ZoneCenter, error) {
+	rows, err := config.PgDB.Query(`
+		SELECT
+			zone::text,
+			'การประปาส่วนภูมิภาค เขต' || ' ' || zone AS name,
+			COALESCE(costcenter, '') AS costcenter,
+			ST_Y(wkb_geometry::geometry) AS lat,
+			ST_X(wkb_geometry::geometry) AS lng
+		FROM pwa_office.zone
+		WHERE wkb_geometry IS NOT NULL
+		ORDER BY zone::int
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var centers []models.ZoneCenter
+	for rows.Next() {
+		var zc models.ZoneCenter
+		if err := rows.Scan(&zc.Zone, &zc.Name, &zc.CostCenter, &zc.Lat, &zc.Lng); err != nil {
+			log.Printf("scan zone center row error: %v", err)
+			continue
+		}
+		centers = append(centers, zc)
+	}
+	return centers, nil
+}
+
+func getZoneCentersFromOffices() ([]models.ZoneCenter, error) {
+	rows, err := config.PgDB.Query(`
+		SELECT
+			zone::text,
+			'การประปาส่วนภูมิภาค เขต' || ' ' || zone AS name,
+			'' AS costcenter,
+			AVG(ST_Y(wkb_geometry::geometry)) AS lat,
+			AVG(ST_X(wkb_geometry::geometry)) AS lng
+		FROM pwa_office.pwa_office234
+		WHERE wkb_geometry IS NOT NULL
+		GROUP BY zone
+		ORDER BY zone::int
+	`)
+	if err != nil {
+		// Try WKB fallback
+		rows, err = config.PgDB.Query(`
+			SELECT
+				zone::text,
+				'การประปาส่วนภูมิภาค เขต' || ' ' || zone AS name,
+				'' AS costcenter,
+				AVG(ST_Y(ST_GeomFromWKB(wkb_geometry, 4326))) AS lat,
+				AVG(ST_X(ST_GeomFromWKB(wkb_geometry, 4326))) AS lng
+			FROM pwa_office.pwa_office234
+			WHERE wkb_geometry IS NOT NULL
+			GROUP BY zone
+			ORDER BY zone::int
+		`)
+		if err != nil {
+			return nil, fmt.Errorf("query zone centers fallback failed: %v", err)
+		}
+	}
+	defer rows.Close()
+
+	var centers []models.ZoneCenter
+	for rows.Next() {
+		var zc models.ZoneCenter
+		if err := rows.Scan(&zc.Zone, &zc.Name, &zc.CostCenter, &zc.Lat, &zc.Lng); err != nil {
+			log.Printf("scan zone center fallback row error: %v", err)
+			continue
+		}
+		centers = append(centers, zc)
+	}
+	return centers, nil
+}
+
 // sortOfficesNumeric sorts offices by zone (numeric ascending) then pwa_code.
 func sortOfficesNumeric(offices []models.PwaOffice) {
 	sort.Slice(offices, func(i, j int) bool {

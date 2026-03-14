@@ -47,6 +47,15 @@ type FeatureCountByBranch struct {
 	Total      int64            `json:"total"`
 }
 
+// ZoneCenter represents a zone center point from pwa_office.zone table.
+type ZoneCenter struct {
+	Zone       string  `json:"zone"`
+	Name       string  `json:"name"`
+	CostCenter string  `json:"costcenter"`
+	Lat        float64 `json:"lat"`
+	Lng        float64 `json:"lng"`
+}
+
 // DateFilterParams holds date filter parameters from API requests.
 type DateFilterParams struct {
 	StartDate string `form:"startDate"` // format: 2024-01-01

@@ -24,6 +24,7 @@ import (
 // AdvancedQueryRequest is the JSON body for POST /api/features/advanced-query.
 type AdvancedQueryRequest struct {
 	PwaCode    string                 `json:"pwaCode"`
+	PwaCodes   []string               `json:"pwaCodes"`   // multiple branches
 	Collection string                 `json:"collection"`
 	Conditions map[string]interface{} `json:"conditions"` // ConditionGroup as raw JSON
 	StartDate  string                 `json:"startDate"`
@@ -33,6 +34,36 @@ type AdvancedQueryRequest struct {
 	SortBy     string                 `json:"sortBy"`
 	SortOrder  string                 `json:"sortOrder"`
 	Limit      int                    `json:"limit"`
+}
+
+// resolvePwaCodes returns the list of pwa codes from the request.
+// Supports both single PwaCode (backward compat) and PwaCodes array.
+func resolvePwaCodes(req *AdvancedQueryRequest) []string {
+	if len(req.PwaCodes) > 0 {
+		var codes []string
+		for _, c := range req.PwaCodes {
+			c = strings.TrimSpace(c)
+			if c != "" {
+				codes = append(codes, c)
+			}
+		}
+		if len(codes) > 0 {
+			return codes
+		}
+	}
+	if req.PwaCode != "" {
+		// Support comma-separated in single field
+		parts := strings.Split(req.PwaCode, ",")
+		var codes []string
+		for _, p := range parts {
+			p = strings.TrimSpace(p)
+			if p != "" {
+				codes = append(codes, p)
+			}
+		}
+		return codes
+	}
+	return nil
 }
 
 // ════════════════════════════════════════════════════════════
@@ -375,7 +406,8 @@ func expandInValues(values []interface{}) []interface{} {
 // Query Execution
 // ════════════════════════════════════════════════════════════
 
-// ExecuteAdvancedQuery runs a structured query and returns paginated results.
+// ExecuteAdvancedQuery runs a structured query across one or more branches
+// and returns paginated results.
 func ExecuteAdvancedQuery(req *AdvancedQueryRequest) (*PaginatedResult, error) {
 	// Validate collection
 	validLayers := GetAllLayerNames()
@@ -390,16 +422,13 @@ func ExecuteAdvancedQuery(req *AdvancedQueryRequest) (*PaginatedResult, error) {
 		return nil, fmt.Errorf("invalid collection: %s", req.Collection)
 	}
 
-	// Find MongoDB collection ID
-	collectionID, err := FindCollectionID(req.PwaCode, req.Collection)
-	if err != nil {
-		return nil, fmt.Errorf("collection not found for %s/%s: %w", req.PwaCode, req.Collection, err)
+	pwaCodes := resolvePwaCodes(req)
+	if len(pwaCodes) == 0 {
+		return nil, fmt.Errorf("at least one pwaCode is required")
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
-
-	coll := config.GetMongoCollection(fmt.Sprintf("features_%s", collectionID))
 
 	// ── Build filter from conditions tree ──
 	filter := bson.M{}
@@ -427,45 +456,12 @@ func ExecuteAdvancedQuery(req *AdvancedQueryRequest) (*PaginatedResult, error) {
 		}
 	}
 
-	// ── Count ──
-	total, err := coll.CountDocuments(ctx, filter)
-	if err != nil {
-		return nil, fmt.Errorf("count error: %w", err)
-	}
-
-	// Apply limit cap
 	limit := req.Limit
 	if limit <= 0 || limit > 10000 {
 		limit = 5000
 	}
-	if total > int64(limit) {
-		total = int64(limit)
-	}
 
-	// ── Pagination ──
-	page := req.Page
-	if page < 1 {
-		page = 1
-	}
-	pageSize := req.PageSize
-	if pageSize < 1 || pageSize > 200 {
-		pageSize = 50
-	}
-
-	totalPages := int(total) / pageSize
-	if int(total)%pageSize > 0 {
-		totalPages++
-	}
-	if totalPages == 0 {
-		totalPages = 1
-	}
-	if page > totalPages {
-		page = totalPages
-	}
-
-	skip := int64((page - 1) * pageSize)
-
-	// ── Sort ──
+	// ── Sort config ──
 	sortKey := "properties.recordDate"
 	sortDir := -1
 	if req.SortBy != "" {
@@ -477,85 +473,148 @@ func ExecuteAdvancedQuery(req *AdvancedQueryRequest) (*PaginatedResult, error) {
 		}
 	}
 
-	// ── Query ──
-	opts := options.Find().
-		SetSkip(skip).
-		SetLimit(int64(pageSize)).
-		SetSort(bson.D{{Key: sortKey, Value: sortDir}}).
-		SetProjection(bson.M{
-			"properties": 1,
-			"_id":        1,
-		})
-
-	cursor, err := coll.Find(ctx, filter, opts)
-	if err != nil {
-		return nil, fmt.Errorf("query error: %w", err)
-	}
-	defer cursor.Close(ctx)
-
-	// ── Process results (same pattern as ListFeaturesPaginated) ──
 	mapping := FieldMapping[req.Collection]
-	var data []map[string]interface{}
+	multiBranch := len(pwaCodes) > 1
+	var allData []map[string]interface{}
+	var totalCount int64
 
-	for cursor.Next(ctx) {
-		var doc bson.M
-		if err := cursor.Decode(&doc); err != nil {
-			log.Printf("[AdvancedQuery] decode error: %v", err)
+	// ── Query each branch ──
+	for _, code := range pwaCodes {
+		collectionID, err := FindCollectionID(code, req.Collection)
+		if err != nil {
+			log.Printf("[AdvancedQuery] skip %s: %v", code, err)
 			continue
 		}
 
-		props, ok := doc["properties"].(bson.M)
-		if !ok {
+		coll := config.GetMongoCollection(fmt.Sprintf("features_%s", collectionID))
+
+		// Count
+		cnt, err := coll.CountDocuments(ctx, filter)
+		if err != nil {
+			log.Printf("[AdvancedQuery] count error %s: %v", code, err)
+			continue
+		}
+		totalCount += cnt
+
+		// Query with remaining limit
+		remaining := int64(limit) - int64(len(allData))
+		if remaining <= 0 {
+			break
+		}
+
+		opts := options.Find().
+			SetLimit(remaining).
+			SetSort(bson.D{{Key: sortKey, Value: sortDir}}).
+			SetProjection(bson.M{"properties": 1, "_id": 1})
+
+		cursor, err := coll.Find(ctx, filter, opts)
+		if err != nil {
+			log.Printf("[AdvancedQuery] query error %s: %v", code, err)
 			continue
 		}
 
-		rawProps := make(map[string]interface{}, len(props))
-		for k, v := range props {
-			switch val := v.(type) {
-			case primitive.DateTime:
-				rawProps[k] = val.Time().Format(time.RFC3339)
-			case primitive.ObjectID:
-				rawProps[k] = val.Hex()
-			case bson.M, bson.A:
+		for cursor.Next(ctx) {
+			var doc bson.M
+			if err := cursor.Decode(&doc); err != nil {
 				continue
-			default:
-				rawProps[k] = v
 			}
-		}
 
-		var row map[string]interface{}
-		if len(mapping) > 0 {
-			row = MapProperties(req.Collection, rawProps)
-		} else {
-			row = rawProps
-		}
+			props, ok := doc["properties"].(bson.M)
+			if !ok {
+				continue
+			}
 
-		if docID, ok := doc["_id"]; ok {
-			if oid, ok := docID.(primitive.ObjectID); ok {
-				row["_doc_id"] = oid.Hex()
+			rawProps := make(map[string]interface{}, len(props))
+			for k, v := range props {
+				switch val := v.(type) {
+				case primitive.DateTime:
+					rawProps[k] = val.Time().Format(time.RFC3339)
+				case primitive.ObjectID:
+					rawProps[k] = val.Hex()
+				case bson.M, bson.A:
+					continue
+				default:
+					rawProps[k] = v
+				}
+			}
+
+			var row map[string]interface{}
+			if len(mapping) > 0 {
+				row = MapProperties(req.Collection, rawProps)
 			} else {
-				row["_doc_id"] = fmt.Sprintf("%v", docID)
+				row = rawProps
 			}
+
+			if docID, ok := doc["_id"]; ok {
+				if oid, ok := docID.(primitive.ObjectID); ok {
+					row["_doc_id"] = oid.Hex()
+				} else {
+					row["_doc_id"] = fmt.Sprintf("%v", docID)
+				}
+			}
+
+			// Add branch identifier for multi-branch results
+			if multiBranch {
+				row["pwa_code"] = code
+			}
+
+			allData = append(allData, row)
 		}
-
-		data = append(data, row)
+		cursor.Close(ctx)
 	}
 
-	if data == nil {
-		data = []map[string]interface{}{}
+	if allData == nil {
+		allData = []map[string]interface{}{}
 	}
+
+	// Cap total at limit
+	if totalCount > int64(limit) {
+		totalCount = int64(limit)
+	}
+
+	// ── Pagination (in-memory for multi-branch) ──
+	page := req.Page
+	if page < 1 {
+		page = 1
+	}
+	pageSize := req.PageSize
+	if pageSize < 1 || pageSize > 200 {
+		pageSize = 50
+	}
+
+	totalPages := int(totalCount) / pageSize
+	if int(totalCount)%pageSize > 0 {
+		totalPages++
+	}
+	if totalPages == 0 {
+		totalPages = 1
+	}
+	if page > totalPages {
+		page = totalPages
+	}
+
+	// Slice current page from merged data
+	start := (page - 1) * pageSize
+	end := start + pageSize
+	if start > len(allData) {
+		start = len(allData)
+	}
+	if end > len(allData) {
+		end = len(allData)
+	}
+	pageData := allData[start:end]
 
 	columns := buildColumnInfo(req.Collection)
 
-	log.Printf("[AdvancedQuery] %s/%s page=%d total=%d rows=%d",
-		req.PwaCode, req.Collection, page, total, len(data))
+	log.Printf("[AdvancedQuery] branches=%d %s page=%d total=%d rows=%d",
+		len(pwaCodes), req.Collection, page, totalCount, len(pageData))
 
 	return &PaginatedResult{
-		Data:       data,
+		Data:       pageData,
 		Columns:    columns,
 		Page:       page,
 		PageSize:   pageSize,
-		Total:      total,
+		Total:      totalCount,
 		TotalPages: totalPages,
 	}, nil
 }
@@ -564,18 +623,16 @@ func ExecuteAdvancedQuery(req *AdvancedQueryRequest) (*PaginatedResult, error) {
 // Export: Advanced Query → GeoJSON (with geometry)
 // ════════════════════════════════════════════════════════════
 
-// ExportAdvancedQueryAsGeoJSON executes the query including geometry
-// and returns a GeoJSON FeatureCollection as bytes.
+// ExportAdvancedQueryAsGeoJSON executes the query (with geometry) across
+// one or more branches and returns a GeoJSON FeatureCollection as bytes.
 func ExportAdvancedQueryAsGeoJSON(req *AdvancedQueryRequest) ([]byte, error) {
-	collectionID, err := FindCollectionID(req.PwaCode, req.Collection)
-	if err != nil {
-		return nil, fmt.Errorf("collection not found: %w", err)
+	pwaCodes := resolvePwaCodes(req)
+	if len(pwaCodes) == 0 {
+		return nil, fmt.Errorf("at least one pwaCode is required")
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
-
-	coll := config.GetMongoCollection(fmt.Sprintf("features_%s", collectionID))
 
 	// Build filter
 	filter := bson.M{}
@@ -602,25 +659,10 @@ func ExportAdvancedQueryAsGeoJSON(req *AdvancedQueryRequest) ([]byte, error) {
 		}
 	}
 
-	// Limit
 	limit := req.Limit
 	if limit <= 0 || limit > 10000 {
 		limit = 5000
 	}
-
-	findOpts := options.Find().
-		SetLimit(int64(limit)).
-		SetProjection(bson.M{
-			"geometry":   1,
-			"properties": 1,
-			"_id":        0,
-		})
-
-	cursor, err := coll.Find(ctx, filter, findOpts)
-	if err != nil {
-		return nil, fmt.Errorf("export query error: %w", err)
-	}
-	defer cursor.Close(ctx)
 
 	type Feature struct {
 		Type       string                 `json:"type"`
@@ -629,36 +671,71 @@ func ExportAdvancedQueryAsGeoJSON(req *AdvancedQueryRequest) ([]byte, error) {
 	}
 
 	var features []Feature
-	for cursor.Next(ctx) {
-		var doc bson.M
-		if err := cursor.Decode(&doc); err != nil {
+	multiBranch := len(pwaCodes) > 1
+
+	for _, code := range pwaCodes {
+		collectionID, err := FindCollectionID(code, req.Collection)
+		if err != nil {
+			log.Printf("[AQ Export] skip %s: %v", code, err)
 			continue
 		}
 
-		geom := doc["geometry"]
-		if geom == nil {
+		coll := config.GetMongoCollection(fmt.Sprintf("features_%s", collectionID))
+
+		remaining := int64(limit) - int64(len(features))
+		if remaining <= 0 {
+			break
+		}
+
+		findOpts := options.Find().
+			SetLimit(remaining).
+			SetProjection(bson.M{
+				"geometry":   1,
+				"properties": 1,
+				"_id":        0,
+			})
+
+		cursor, err := coll.Find(ctx, filter, findOpts)
+		if err != nil {
+			log.Printf("[AQ Export] query error %s: %v", code, err)
 			continue
 		}
 
-		props := make(map[string]interface{})
-		if p, ok := doc["properties"].(bson.M); ok {
-			for k, v := range p {
-				switch val := v.(type) {
-				case primitive.DateTime:
-					props[k] = val.Time().Format(time.RFC3339)
-				case bson.M, bson.A:
-					continue
-				default:
-					props[k] = v
+		for cursor.Next(ctx) {
+			var doc bson.M
+			if err := cursor.Decode(&doc); err != nil {
+				continue
+			}
+
+			geom := doc["geometry"]
+			if geom == nil {
+				continue
+			}
+
+			props := make(map[string]interface{})
+			if p, ok := doc["properties"].(bson.M); ok {
+				for k, v := range p {
+					switch val := v.(type) {
+					case primitive.DateTime:
+						props[k] = val.Time().Format(time.RFC3339)
+					case bson.M, bson.A:
+						continue
+					default:
+						props[k] = v
+					}
 				}
 			}
-		}
+			if multiBranch {
+				props["pwaCode"] = code
+			}
 
-		features = append(features, Feature{
-			Type:       "Feature",
-			Geometry:   cleanBsonForJSON(geom),
-			Properties: props,
-		})
+			features = append(features, Feature{
+				Type:       "Feature",
+				Geometry:   cleanBsonForJSON(geom),
+				Properties: props,
+			})
+		}
+		cursor.Close(ctx)
 	}
 
 	if features == nil {
@@ -669,7 +746,7 @@ func ExportAdvancedQueryAsGeoJSON(req *AdvancedQueryRequest) ([]byte, error) {
 		"type":     "FeatureCollection",
 		"features": features,
 		"metadata": map[string]interface{}{
-			"pwaCode":    req.PwaCode,
+			"pwaCodes":   pwaCodes,
 			"collection": req.Collection,
 			"count":      len(features),
 		},

@@ -35,19 +35,8 @@ var LAYER_COLORS = [
     '#1ABC9C', '#E67E22', '#34495E', '#D35400'
 ];
 
-// PWA Zone office centers (approximate coordinates for zone-level markers)
-var ZONE_CENTERS = {
-    "1":  { lat: 13.36, lng: 101.15, name: "East",           region: "Zone 1 (Chonburi)" },
-    "2":  { lat: 14.53, lng: 100.90, name: "Central",        region: "Zone 2 (Saraburi)" },
-    "3":  { lat: 13.54, lng: 99.82,  name: "West",           region: "Zone 3 (Ratchaburi)" },
-    "4":  { lat: 9.40,  lng: 99.10,  name: "Upper South",    region: "Zone 4 (Surat Thani)" },
-    "5":  { lat: 7.20,  lng: 100.50, name: "Lower South",    region: "Zone 5 (Songkhla)" },
-    "6":  { lat: 16.20, lng: 102.80, name: "Central Isan",   region: "Zone 6 (Khon Kaen)" },
-    "7":  { lat: 17.40, lng: 102.30, name: "Upper Isan",     region: "Zone 7 (Udon Thani)" },
-    "8":  { lat: 15.25, lng: 104.85, name: "Lower Isan",     region: "Zone 8 (Ubon Ratchathani)" },
-    "9":  { lat: 18.50, lng: 99.00,  name: "Upper North",    region: "Zone 9 (Chiang Mai)" },
-    "10": { lat: 16.40, lng: 100.30, name: "Lower North",    region: "Zone 10 (Nakhon Sawan)" }
-};
+// PWA Zone office centers (loaded from PostGIS /api/zones/centers)
+var ZONE_CENTERS = {};
 
 // ==========================================
 // Initialization (uses ThaiDatePicker from thai_custom_date.js)
@@ -57,6 +46,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     ThaiDatePicker.init('#filterStartDate');
     ThaiDatePicker.init('#filterEndDate');
 
+    await loadZoneCenters();
     await loadZones();
     await loadYears();
     await loadLayers();
@@ -117,51 +107,71 @@ async function loadLayers() {
     } catch (e) { console.error('Load layers error:', e); }
 }
 
+/** Load zone center coordinates from PostGIS. */
+async function loadZoneCenters() {
+    try {
+        var data = await apiGet('/pwa_gis_tracking/api/zones/centers');
+        if (data.data) {
+            data.data.forEach(function(zc) {
+                ZONE_CENTERS[zc.zone] = {
+                    lat: zc.lat,
+                    lng: zc.lng,
+                    name: zc.name,
+                    region: zc.name,
+                    costcenter: zc.costcenter
+                };
+            });
+        }
+    } catch (e) { console.error('Load zone centers error:', e); }
+}
+
 // ==========================================
-// Leaflet Map with Zone + Branch Markers
+// MapLibre Map with Zone + Branch Markers
 // ==========================================
 
-/** Initialize the Leaflet map with zone center markers. */
+/** Initialize the MapLibre map with zone center markers. */
 function initZoneMap() {
-    if (!window.L) return;
+    if (!window.maplibregl) return;
 
-    zoneMap = L.map('zoneMap', {
-        center: [13.0, 101.0],
+    zoneMap = new maplibregl.Map({
+        container: 'zoneMap',
+        style: {
+            version: 8,
+            sources: {
+                osm: {
+                    type: 'raster',
+                    tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+                    tileSize: 256
+                }
+            },
+            layers: [{
+                id: 'osm',
+                type: 'raster',
+                source: 'osm',
+                paint: { 'raster-opacity': 0.55 }
+            }]
+        },
+        center: [101.0, 13.0],
         zoom: 6,
-        zoomControl: true,
-        scrollWheelZoom: true,
         attributionControl: false
     });
-
-    // OpenStreetMap tile layer
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 18,
-        opacity: 0.55
-    }).addTo(zoneMap);
+    zoneMap.addControl(new maplibregl.NavigationControl(), 'top-right');
 
     // Add numbered zone markers (large circles at zone centers)
     Object.keys(ZONE_CENTERS).forEach(function(zoneId) {
         var z = ZONE_CENTERS[zoneId];
         var color = ZONE_COLORS[parseInt(zoneId) - 1] || '#999';
 
-        var icon = L.divIcon({
-            className: 'zone-map-marker',
-            html: '<div style="' +
-                'background:' + color + ';color:#fff;' +
-                'width:42px;height:42px;border-radius:50%;' +
-                'display:flex;align-items:center;justify-content:center;' +
-                'font-weight:700;font-size:15px;' +
-                'border:3px solid rgba(255,255,255,0.9);' +
-                'box-shadow:0 2px 10px rgba(0,0,0,0.4);cursor:pointer;' +
-                'transition:transform .15s ease;z-index:1000;' +
-                '" onmouseover="this.style.transform=\'scale(1.2)\'" ' +
-                'onmouseout="this.style.transform=\'scale(1)\'">' + zoneId + '</div>',
-            iconSize: [42, 42],
-            iconAnchor: [21, 21]
-        });
-
-        var marker = L.marker([z.lat, z.lng], { icon: icon, zIndexOffset: 1000 }).addTo(zoneMap);
-        marker.bindPopup(
+        var el = document.createElement('div');
+        el.style.cssText = 'background:' + color + ';color:#fff;' +
+            'width:42px;height:42px;border-radius:50%;' +
+            'display:flex;align-items:center;justify-content:center;' +
+            'font-weight:700;font-size:15px;' +
+            'border:3px solid rgba(255,255,255,0.9);' +
+            'box-shadow:0 2px 10px rgba(0,0,0,0.4);cursor:pointer;' +
+            'transition:transform .15s ease;';
+        el.textContent = zoneId;
+        var popup = new maplibregl.Popup({ offset: 25, closeButton: false }).setHTML(
             '<div style="text-align:center;min-width:160px;font-family:\'Noto Sans Thai\',sans-serif;">' +
             '<div style="font-size:15px;font-weight:700;margin-bottom:4px;">เขต ' + zoneId + '</div>' +
             '<div style="color:#555;font-size:12px;">' + z.region + '</div>' +
@@ -170,17 +180,32 @@ function initZoneMap() {
             '</div>'
         );
 
-        // Click zone marker -> filter dashboard to this zone
-        marker.on('click', function() {
+        var marker = new maplibregl.Marker({ element: el })
+            .setLngLat([z.lng, z.lat])
+            .setPopup(popup)
+            .addTo(zoneMap);
+
+        // Hover zone marker -> show popup with data
+        el.addEventListener('mouseenter', function() {
+            el.style.transform = 'scale(1.2)';
+            if (!marker.getPopup().isOpen()) marker.togglePopup();
+        });
+        el.addEventListener('mouseleave', function() {
+            el.style.transform = 'scale(1)';
+            if (marker.getPopup().isOpen()) marker.togglePopup();
+        });
+
+        // Click zone marker -> zoom + hide others + filter dashboard
+        el.addEventListener('click', function(e) {
+            e.stopPropagation();
             document.getElementById('filterZone').value = zoneId;
-            document.querySelectorAll('.zone-item').forEach(function(item) {
-                item.classList.remove('active');
-                if (item.getAttribute('data-zone') === zoneId) item.classList.add('active');
+            // Find and activate the matching sidebar item
+            var items = document.querySelectorAll('.zone-item');
+            var targetItem = null;
+            items.forEach(function(item) {
+                if (item.getAttribute('data-zone') === zoneId) targetItem = item;
             });
-            var filtered = allBranches.filter(function(b) { return b.zone === zoneId; });
-            document.getElementById('detailTitle').textContent = 'สาขาในเขต ' + zoneId;
-            renderBranchList(filtered);
-            renderFullTable(filtered);
+            if (targetItem) selectZone(targetItem, zoneId);
         });
 
         zoneMarkers[zoneId] = marker;
@@ -192,10 +217,6 @@ function initZoneMap() {
 }
 
 /**
- * Load branch markers with real coordinates from PostgreSQL wkb_geometry.
- * Each branch is shown as a small colored dot on the map.
- */
-/**
  * Load branch markers from /pwa_gis_tracking/api/offices/geom.
  * Uses FontAwesome house-flood-water icon colored by zone.
  * Stores markers for hover tooltip enrichment after dashboard loads.
@@ -205,7 +226,8 @@ async function loadBranchMarkers() {
         var data = await apiGet('/pwa_gis_tracking/api/offices/geom');
         if (!data.data || !zoneMap) return;
 
-        branchMarkerLayer = L.layerGroup().addTo(zoneMap);
+        // Store as array for bulk removal
+        branchMarkerLayer = [];
         branchMarkerMap = {};
 
         data.data.forEach(function(office) {
@@ -215,21 +237,13 @@ async function loadBranchMarkers() {
             var zoneIdx = parseInt(office.zone) - 1;
             var color = ZONE_COLORS[zoneIdx >= 0 ? zoneIdx : 0] || '#999';
 
-            var icon = L.divIcon({
-                className: 'branch-marker',
-                html: '<div style="' +
-                    'color:' + color + ';font-size:14px;' +
-                    'text-shadow:0 1px 3px rgba(0,0,0,0.4),0 0 2px rgba(255,255,255,0.8);' +
-                    'cursor:pointer;' +
-                    '"><i class="fa-solid fa-house-flood-water"></i></div>',
-                iconSize: [16, 16],
-                iconAnchor: [8, 8]
-            });
+            var el = document.createElement('div');
+            el.innerHTML = '<i class="fa-solid fa-house-flood-water"></i>';
+            el.style.cssText = 'color:' + color + ';font-size:14px;' +
+                'text-shadow:0 1px 3px rgba(0,0,0,0.4),0 0 2px rgba(255,255,255,0.8);' +
+                'cursor:pointer;';
 
-            var m = L.marker([office.lat, office.lng], { icon: icon }).addTo(branchMarkerLayer);
-
-            // Default popup (click)
-            m.bindPopup(
+            var popup = new maplibregl.Popup({ offset: 15, closeButton: false }).setHTML(
                 '<div style="font-family:\'Noto Sans Thai\',sans-serif;min-width:140px;">' +
                 '<div style="font-weight:600;font-size:13px;">' + office.name + '</div>' +
                 '<div style="color:#666;font-size:11px;">รหัส: ' + office.pwa_code + '</div>' +
@@ -237,12 +251,13 @@ async function loadBranchMarkers() {
                 '</div>'
             );
 
-            // Default hover tooltip (enriched after dashboard data loads)
-            m.bindTooltip(office.pwa_code + ' ' + office.name, {
-                direction: 'top', offset: [0, -10], className: 'branch-tooltip'
-            });
+            var m = new maplibregl.Marker({ element: el })
+                .setLngLat([office.lng, office.lat])
+                .setPopup(popup)
+                .addTo(zoneMap);
 
-            branchMarkerMap[office.pwa_code] = { marker: m, office: office };
+            branchMarkerLayer.push(m);
+            branchMarkerMap[office.pwa_code] = { marker: m, office: office, element: el };
         });
 
     } catch (e) {
@@ -251,7 +266,7 @@ async function loadBranchMarkers() {
 }
 
 /**
- * Enrich branch marker tooltips with meter count and pipe length.
+ * Enrich branch marker popups with meter count and pipe length.
  * Called after dashboard data loads.
  */
 async function updateBranchTooltips() {
@@ -271,37 +286,21 @@ async function updateBranchTooltips() {
         var zoneIdx = parseInt(office.zone) - 1;
         var color = ZONE_COLORS[zoneIdx >= 0 ? zoneIdx : 0] || '#999';
 
-        // Rebind hover tooltip with data
-        entry.marker.unbindTooltip();
-        entry.marker.bindTooltip(
-            '<div style="font-family:\'Noto Sans Thai\',sans-serif;min-width:180px;line-height:1.5;">' +
-            '<div style="font-weight:700;font-size:13px;color:' + color + ';">' +
-            '<i class="fa-solid fa-house-flood-water" style="margin-right:4px;"></i>' + office.name + '</div>' +
-            '<div style="color:#555;font-size:11px;margin-bottom:4px;">รหัส ' + b.pwa_code + ' | เขต ' + b.zone + '</div>' +
-            '<hr style="margin:0 0 4px 0;border:0;border-top:1px solid #e0e0e0;">' +
-            '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px;">' +
-            '<span style="color:#666;">มาตรวัดน้ำ</span>' +
-            '<span style="font-weight:700;color:#3498DB;">' + formatNumber(meterCount) + '</span></div>' +
-            '<div style="display:flex;justify-content:space-between;font-size:12px;">' +
-            '<span style="color:#666;">ความยาวท่อ(ม.)</span>' +
-            '<span style="font-weight:700;color:#E67E22;">' + formatDecimal(pipeLong) + '</span></div>' +
-            '</div>',
-            { direction: 'top', offset: [0, -10], className: 'branch-tooltip', sticky: false }
-        );
-
-        // Also enrich click popup
-        entry.marker.unbindPopup();
-        entry.marker.bindPopup(
+        // Update popup with enriched data
+        var popupHtml =
             '<div style="font-family:\'Noto Sans Thai\',sans-serif;min-width:190px;line-height:1.6;">' +
             '<div style="font-weight:700;font-size:14px;color:' + color + ';">' +
             '<i class="fa-solid fa-house-flood-water" style="margin-right:4px;"></i>' + office.name + '</div>' +
             '<div style="color:#666;font-size:11px;margin-bottom:6px;">รหัส ' + b.pwa_code + ' | เขต ' + b.zone + '</div>' +
             '<div style="background:#f8f9fa;border-radius:6px;padding:6px 8px;font-size:12px;">' +
             '<div style="display:flex;justify-content:space-between;margin-bottom:3px;">' +
-            '<span>💧 มาตรวัดน้ำ</span><strong style="color:#3498DB;">' + formatNumber(meterCount) + '</strong></div>' +
+            '<span>มาตรวัดน้ำ</span><strong style="color:#3498DB;">' + formatNumber(meterCount) + '</strong></div>' +
             '<div style="display:flex;justify-content:space-between;">' +
-            '<span>📏 ความยาวท่อ</span><strong style="color:#E67E22;">' + formatDecimal(pipeLong) + ' ม.</strong></div>' +
-            '</div></div>'
+            '<span>ความยาวท่อ</span><strong style="color:#E67E22;">' + formatDecimal(pipeLong) + ' ม.</strong></div>' +
+            '</div></div>';
+
+        entry.marker.setPopup(
+            new maplibregl.Popup({ offset: 15, closeButton: false }).setHTML(popupHtml)
         );
     });
 }
@@ -323,49 +322,34 @@ function updateMapPopups(data) {
         zonePipe[z] += b.pipe_long || 0;
     });
 
+    // Update zone marker popups with enriched data
     Object.keys(ZONE_CENTERS).forEach(function(zoneId) {
+        var marker = zoneMarkers[zoneId];
+        if (!marker) return;
         var zd = zt[zoneId] || {};
         var branchCount = zd._branches || 0;
         var meterCount = zoneMeter[zoneId] || 0;
         var pipeLong = zonePipe[zoneId] || 0;
-        var el = document.getElementById('mapPop' + zoneId);
-        if (el) {
-            el.innerHTML =
-                '<div style="font-size:12px;text-align:left;margin-top:4px;">' +
-                '<div style="display:flex;justify-content:space-between;margin-bottom:2px;">' +
-                '<span style="color:#666;">สาขา</span>' +
-                '<span style="font-weight:700;">' + branchCount + ' สาขา</span></div>' +
-                '<div style="display:flex;justify-content:space-between;margin-bottom:2px;">' +
-                '<span style="color:#666;">💧 จำนวนมาตรวัดน้ำ</span>' +
-                '<span style="font-weight:700;color:#3498DB;">' + formatNumber(meterCount) + ' เครื่อง</span></div>' +
-                '<div style="display:flex;justify-content:space-between;">' +
-                '<span style="color:#666;">📏 ความยาวท่อรวม</span>' +
-                '<span style="font-weight:700;color:#E67E22;">' + formatDecimal(pipeLong) + ' ม.</span></div>' +
-                '</div>';
-        }
-    });
-
-    // Also add zone marker hover tooltips with meter/pipe data
-    Object.keys(ZONE_CENTERS).forEach(function(zoneId) {
-        var marker = zoneMarkers[zoneId];
-        if (!marker) return;
-        var meterCount = zoneMeter[zoneId] || 0;
-        var pipeLong = zonePipe[zoneId] || 0;
         var color = ZONE_COLORS[parseInt(zoneId) - 1] || '#999';
 
-        marker.unbindTooltip();
-        marker.bindTooltip(
-            '<div style="font-family:\'Noto Sans Thai\',sans-serif;min-width:200px;line-height:1.5;">' +
-            '<div style="font-weight:700;font-size:13px;color:' + color + ';margin-bottom:4px;">เขต ' + zoneId + '</div>' +
-            '<hr style="margin:0 0 4px 0;border:0;border-top:1px solid #e0e0e0;">' +
-            '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px;">' +
-            '<span style="color:#666;">💧 จำนวนมาตรวัดน้ำในเขต</span>' +
+        var popupHtml =
+            '<div style="text-align:center;min-width:200px;font-family:\'Noto Sans Thai\',sans-serif;">' +
+            '<div style="font-size:15px;font-weight:700;margin-bottom:4px;">เขต ' + zoneId + '</div>' +
+            '<div style="color:#555;font-size:12px;">' + (ZONE_CENTERS[zoneId].region || '') + '</div>' +
+            '<div style="font-size:12px;text-align:left;margin-top:8px;">' +
+            '<div style="display:flex;justify-content:space-between;margin-bottom:2px;">' +
+            '<span style="color:#666;">สาขา</span>' +
+            '<span style="font-weight:700;">' + branchCount + ' สาขา</span></div>' +
+            '<div style="display:flex;justify-content:space-between;margin-bottom:2px;">' +
+            '<span style="color:#666;">จำนวนมาตรวัดน้ำ</span>' +
             '<span style="font-weight:700;color:#3498DB;">' + formatNumber(meterCount) + ' เครื่อง</span></div>' +
-            '<div style="display:flex;justify-content:space-between;font-size:12px;">' +
-            '<span style="color:#666;">📏 ความยาวท่อรวมในเขต</span>' +
+            '<div style="display:flex;justify-content:space-between;">' +
+            '<span style="color:#666;">ความยาวท่อรวม</span>' +
             '<span style="font-weight:700;color:#E67E22;">' + formatDecimal(pipeLong) + ' ม.</span></div>' +
-            '</div>',
-            { direction: 'top', offset: [0, -25], className: 'zone-tooltip', sticky: false }
+            '</div></div>';
+
+        marker.setPopup(
+            new maplibregl.Popup({ offset: 25, closeButton: false }).setHTML(popupHtml)
         );
     });
 }
@@ -470,7 +454,6 @@ function renderStats(data) {
     var stats = [
         { label: 'สาขาทั้งหมด', value: formatNumber(totalBranches), color: 'blue', suffix: 'สาขา' },
         { label: 'ปริมาณข้อมูลทั้งหมด (features)', value: formatNumber(totalFeatures), color: 'gold', suffix: '' },
-        { label: 'เขต', value: data.zone_names ? data.zone_names.length : 0, color: 'green', suffix: 'เขต' },
         { label: pipeLabel, value: pipeValue, color: 'cyan', suffix: pipeSuffix },
         { label: 'หัวดับเพลิง', value: formatNumber(firehydrantCount), color: 'blue', suffix: 'records' },
         { label: 'ประตูน้ำ', value: formatNumber(valveCount), color: 'green', suffix: 'records' },
@@ -531,18 +514,43 @@ function selectZone(el, zone) {
         filtered = allBranches.filter(function(b) { return b.zone === zone; });
         document.getElementById('detailTitle').textContent = 'สาขาในเขต ' + zone;
 
-        // Fly map to selected zone
+        // Fly map to selected zone, hide other zone markers
         if (zoneMap && ZONE_CENTERS[zone]) {
-            zoneMap.flyTo([ZONE_CENTERS[zone].lat, ZONE_CENTERS[zone].lng], 8, { duration: 0.8 });
-            if (zoneMarkers[zone]) zoneMarkers[zone].openPopup();
+            zoneMap.flyTo({ center: [ZONE_CENTERS[zone].lng, ZONE_CENTERS[zone].lat], zoom: 8, duration: 800 });
+            showOnlyZoneMarker(zone);
+            // Show popup for the selected zone
+            if (zoneMarkers[zone] && !zoneMarkers[zone].getPopup().isOpen()) {
+                zoneMarkers[zone].togglePopup();
+            }
         }
     } else {
         document.getElementById('detailTitle').textContent = 'มาตรวัดน้ำทั้งหมด';
-        if (zoneMap) zoneMap.flyTo([13.0, 101.0], 6, { duration: 0.8 });
+        if (zoneMap) {
+            zoneMap.flyTo({ center: [101.0, 13.0], zoom: 6, duration: 800 });
+            showAllZoneMarkers();
+        }
     }
 
     renderBranchList(filtered);
     renderFullTable(filtered);
+}
+
+/** Show only the specified zone marker, hide all others. */
+function showOnlyZoneMarker(zoneId) {
+    Object.keys(zoneMarkers).forEach(function(id) {
+        if (id !== zoneId) {
+            zoneMarkers[id].remove();
+        } else {
+            zoneMarkers[id].addTo(zoneMap);
+        }
+    });
+}
+
+/** Show all zone markers on the map. */
+function showAllZoneMarkers() {
+    Object.keys(zoneMarkers).forEach(function(id) {
+        zoneMarkers[id].addTo(zoneMap);
+    });
 }
 
 /** Render the doughnut chart showing feature distribution by layer. */
@@ -767,7 +775,10 @@ function resetFilters() {
     if (fpStart) fpStart.clear();
     if (fpEnd) fpEnd.clear();
 
-    if (zoneMap) zoneMap.flyTo([13.0, 101.0], 6, { duration: 0.5 });
+    if (zoneMap) {
+        zoneMap.flyTo({ center: [101.0, 13.0], zoom: 6, duration: 500 });
+        showAllZoneMarkers();
+    }
     loadDashboard();
 }
 

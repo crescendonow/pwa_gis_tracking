@@ -11,10 +11,10 @@
       rel="stylesheet"
       href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css"
     />
-    <!-- Leaflet -->
+    <!-- MapLibre GL -->
     <link
       rel="stylesheet"
-      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      href="https://unpkg.com/maplibre-gl@4.5.0/dist/maplibre-gl.css"
     />
     <!-- FontAwesome -->
     <link
@@ -25,20 +25,18 @@
     <!-- Responsive style -->
     <link rel="stylesheet" href="/pwa_gis_tracking/static/css/responsive.css" />
     <style>
-      /* Branch marker tooltip styling */
-      .branch-tooltip {
-        background: rgba(255, 255, 255, 0.97) !important;
-        border: 1px solid #ddd !important;
-        border-radius: 8px !important;
-        padding: 0 !important;
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15) !important;
-        font-family: "Noto Sans Thai", "Poppins", sans-serif !important;
-      }
-      .branch-tooltip .leaflet-tooltip-content {
+      /* MapLibre popup styling */
+      .maplibregl-popup-content {
+        background: rgba(255, 255, 255, 0.97);
+        border: 1px solid #ddd;
+        border-radius: 8px;
         padding: 8px 12px;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+        font-family: "Noto Sans Thai", "Poppins", sans-serif;
       }
-      .branch-tooltip::before {
-        border-top-color: #ddd !important;
+      #zoneMap {
+        width: 100%;
+        height: 100%;
       }
       /* Pagination controls */
       #fullTablePagination {
@@ -418,8 +416,8 @@
     <!-- Flatpickr -->
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/th.js"></script>
-    <!-- Leaflet -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- MapLibre GL -->
+    <script src="https://unpkg.com/maplibre-gl@4.5.0/dist/maplibre-gl.js"></script>
 
     <script src="/pwa_gis_tracking/static/js/thai_custom_date.js"></script>
     <script src="/pwa_gis_tracking/static/js/layer_modal.js"></script>

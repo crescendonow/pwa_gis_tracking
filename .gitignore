@@ -3,3 +3,5 @@
 /doc
 /services/text_to_query/.env
 /services/text_to_query/.env.example
+/.claude
+/.vscode

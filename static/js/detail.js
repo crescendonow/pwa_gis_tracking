@@ -48,15 +48,20 @@ var PIPE_SIZE_COLORS = {
 };
 var LAYER_COLORS = ['#3498DB', '#E74C3C', '#2ECC71', '#F39C12', '#9B59B6', '#1ABC9C', '#E67E22', '#34495E', '#D35400'];
 
+// Zone centers cache (loaded from /api/zones/centers)
+var zoneCentersCache = {};
+
 /* ─── Init ───────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', async function () {
     ThaiDatePicker.init('#detailStartDate');
     ThaiDatePicker.init('#detailEndDate');
     await loadSessionInfo();
-    await Promise.all([loadAllZonesAndOffices(), loadLayerList()]);
+    await Promise.all([loadAllZonesAndOffices(), loadLayerList(), loadZoneCentersForDetail()]);
     renderBranchSelector();
     renderLayerGrid();
     initExportSortable();
+    // Initialize map immediately so chatbot can render features
+    initDetailMap();
 });
 
 /* ─── API Helper ─────────────────────────────── */
@@ -104,6 +109,32 @@ async function loadLayerList() {
         var data = await apiGet('/pwa_gis_tracking/api/layers');
         allLayers = data.data || [];
     } catch (e) { console.error('Load layers error:', e); }
+}
+
+/** Load zone center coordinates from PostGIS for detail page. */
+async function loadZoneCentersForDetail() {
+    try {
+        var data = await apiGet('/pwa_gis_tracking/api/zones/centers');
+        if (data.data) {
+            data.data.forEach(function(zc) {
+                zoneCentersCache[zc.zone] = { lat: zc.lat, lng: zc.lng, name: zc.name };
+            });
+        }
+    } catch (e) { console.error('Load zone centers error:', e); }
+}
+
+/** Initialize the map on page load, centered on the user's zone if available. */
+function initDetailMap() {
+    var map = ensureMap();
+    if (!map) return;
+    // Fly to user's zone center if available
+    var zone = userSession.area || '';
+    if (zone && zoneCentersCache[zone]) {
+        var zc = zoneCentersCache[zone];
+        map.once('load', function() {
+            map.flyTo({ center: [zc.lng, zc.lat], zoom: 10, duration: 1000 });
+        });
+    }
 }
 
 /* ═══════════════════════════════════════════════ */
@@ -321,10 +352,10 @@ async function executeQuery() {
 
 function openAdvancedQuery() {
     if (selectedBranches.length === 0) { showToast('กรุณาเลือกสาขาก่อน', 'error'); return; }
-    if (selectedBranches.length > 1) { showToast('การค้นหาขั้นสูงรองรับ 1 สาขา', 'error'); return; }
     if (selectedLayers.length === 0) { showToast('กรุณาเลือกชั้นข้อมูลอย่างน้อย 1 ชั้น', 'error'); return; }
     AdvancedQuery.open({
         pwaCode: selectedBranches[0],
+        pwaCodes: selectedBranches,
         collection: selectedLayers[0],
         availableLayers: selectedLayers,
         startDate: document.getElementById('detailStartDate').value,
@@ -415,13 +446,11 @@ async function loadMapForMultiBranch(pwaCodes, startDate, endDate) {
             var pwa = pwaCodes[bi];
             showLoading('โหลดแผนที่ ' + displayName + ' — ' + pwa + ' (' + (bi + 1) + '/' + pwaCodes.length + ')...');
             try {
-                var url = '/pwa_gis_tracking/api/features/map?pwaCode=' + pwa + '&collection=' + layerName;
-                if (startDate) url += '&startDate=' + startDate;
-                if (endDate) url += '&endDate=' + endDate;
-                var res = await fetch(url);
-                if (!res.ok) continue;
-                var geojson = await res.json();
-                if (!geojson.features || !geojson.features.length) continue;
+                var mUrl = '/pwa_gis_tracking/api/features/map?pwaCode=' + pwa + '&collection=' + layerName;
+                if (startDate) mUrl += '&startDate=' + startDate;
+                if (endDate) mUrl += '&endDate=' + endDate;
+                var geojson = await _fetchMapData(mUrl);
+                if (!geojson || !geojson.features || !geojson.features.length) continue;
 
                 // Tag each feature with its pwaCode for click-handler
                 geojson.features.forEach(function (f) {
@@ -615,6 +644,34 @@ function toggleBasemap() {
 
 }
 
+/**
+ * Fetch map data: tries FlatGeobuf first, falls back to GeoJSON on error.
+ */
+async function _fetchMapData(url) {
+    try {
+        var res = await fetch(url);
+        if (!res.ok) return null;
+        var contentType = res.headers.get('Content-Type') || '';
+        if (contentType.indexOf('flatgeobuf') >= 0 && typeof flatgeobuf !== 'undefined') {
+            try {
+                var buf = await res.arrayBuffer();
+                var features = [];
+                for await (var f of flatgeobuf.deserialize(new Uint8Array(buf))) { features.push(f); }
+                return { type: 'FeatureCollection', features: features };
+            } catch (fgbErr) {
+                console.warn('FGB decode failed, fallback to GeoJSON:', fgbErr.message);
+                var fallbackRes = await fetch(url + (url.indexOf('?') >= 0 ? '&' : '?') + 'format=geojson');
+                if (!fallbackRes.ok) return null;
+                return await fallbackRes.json();
+            }
+        }
+        return await res.json();
+    } catch (e) {
+        console.error('_fetchMapData error:', e);
+        return null;
+    }
+}
+
 function clearMapFeatures() {
     if (!detailMap) return;
     mapLoadedLayers.forEach(function (id) { if (detailMap.getLayer(id)) detailMap.removeLayer(id); });
@@ -649,13 +706,11 @@ async function loadMapForBranch(pwaCode, startDate, endDate) {
         var displayName = getLayerDisplayName(layerName);
         showLoading('โหลดแผนที่ ' + displayName + '...');
         try {
-            var url = '/pwa_gis_tracking/api/features/map?pwaCode=' + pwaCode + '&collection=' + layerName;
-            if (startDate) url += '&startDate=' + startDate;
-            if (endDate) url += '&endDate=' + endDate;
-            var res = await fetch(url);
-            if (!res.ok) continue;
-            var geojson = await res.json();
-            if (!geojson.features || !geojson.features.length) continue;
+            var baseUrl = '/pwa_gis_tracking/api/features/map?pwaCode=' + pwaCode + '&collection=' + layerName;
+            if (startDate) baseUrl += '&startDate=' + startDate;
+            if (endDate) baseUrl += '&endDate=' + endDate;
+            var geojson = await _fetchMapData(baseUrl);
+            if (!geojson || !geojson.features || !geojson.features.length) continue;
 
             var sourceId = 'src-' + layerName;
             map.addSource(sourceId, {
