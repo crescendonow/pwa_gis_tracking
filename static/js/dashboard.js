@@ -135,22 +135,7 @@ function initZoneMap() {
 
     zoneMap = new maplibregl.Map({
         container: 'zoneMap',
-        style: {
-            version: 8,
-            sources: {
-                osm: {
-                    type: 'raster',
-                    tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-                    tileSize: 256
-                }
-            },
-            layers: [{
-                id: 'osm',
-                type: 'raster',
-                source: 'osm',
-                paint: { 'raster-opacity': 0.55 }
-            }]
-        },
+        style: { version: 8, sources: { osm: { type: 'raster', tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'], tileSize: 256, attribution: '&copy; OpenStreetMap' } }, layers: [{ id: 'osm', type: 'raster', source: 'osm' }] },
         center: [101.0, 13.0],
         zoom: 6,
         attributionControl: false

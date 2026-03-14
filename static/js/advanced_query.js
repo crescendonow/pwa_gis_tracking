@@ -43,6 +43,7 @@ var AdvancedQuery = (function () {
     executed: false,
     viewMode: "table",  // "table" or "map"
     mapInstance: null,
+    hiddenColumns: {},
   };
 
   var modalEl = null;
@@ -149,6 +150,9 @@ var AdvancedQuery = (function () {
       '        <button class="aq-btn aq-btn-xs aq-view-btn" id="aqViewMap" onclick="AdvancedQuery._setView(\'map\')">' +
       '          <i class="fa-solid fa-map"></i> Map</button>' +
       "      </div>" +
+      '      <button class="aq-btn aq-btn-xs" id="aqColToggle" onclick="AdvancedQuery._toggleColumns()" title="เลือก Columns">' +
+      '        <i class="fa-solid fa-table-columns"></i> Columns</button>' +
+      '      <div class="aq-col-dropdown" id="aqColDropdown" style="display:none"></div>' +
       '      <div class="aq-export-btns">' +
       '        <span class="aq-export-label">Export:</span>' +
       '        <button class="aq-btn aq-btn-xs" onclick="AdvancedQuery._export(\'csv\')">CSV</button>' +
@@ -236,6 +240,7 @@ var AdvancedQuery = (function () {
     state.sortOrder = "desc";
     state.gridApi = null;
     state.viewMode = "table";
+    state.hiddenColumns = {};
 
     // Reset conditions
     state.conditions = newGroup("AND");
@@ -903,6 +908,7 @@ var AdvancedQuery = (function () {
 
         for (var i = 0; i < cols.length; i++) {
           if (cols[i].key === "_doc_id" || cols[i].key === "password") continue;
+          if (state.hiddenColumns[cols[i].key]) continue;
           colDefs.push({
             headerName: cols[i].key,
             field: cols[i].key,
@@ -968,6 +974,7 @@ var AdvancedQuery = (function () {
     html += "<th>#</th>";
     for (var i = 0; i < cols.length; i++) {
       if (cols[i].key === "_doc_id" || cols[i].key === "password") continue;
+      if (state.hiddenColumns[cols[i].key]) continue;
       html += "<th>" + esc(cols[i].key) + "</th>";
     }
     html += "</tr></thead><tbody>";
@@ -976,6 +983,7 @@ var AdvancedQuery = (function () {
       html += "<tr><td>" + ((state.page - 1) * state.pageSize + r + 1) + "</td>";
       for (var j = 0; j < cols.length; j++) {
         if (cols[j].key === "_doc_id" || cols[j].key === "password") continue;
+        if (state.hiddenColumns[cols[j].key]) continue;
         var val = row[cols[j].key];
         html += "<td>" + (val != null ? esc(String(val)) : "") + "</td>";
       }
@@ -1266,19 +1274,7 @@ var AdvancedQuery = (function () {
       mapEl.innerHTML = "";
       state.mapInstance = new maplibregl.Map({
         container: mapEl,
-        style: {
-          version: 8,
-          sources: {
-            osm: {
-              type: "raster",
-              tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
-              tileSize: 256,
-            },
-          },
-          layers: [
-            { id: "osm", type: "raster", source: "osm", paint: { "raster-opacity": 0.55 } },
-          ],
-        },
+        style: { version: 8, sources: { osm: { type: 'raster', tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'], tileSize: 256, attribution: '&copy; OpenStreetMap' } }, layers: [{ id: 'osm', type: 'raster', source: 'osm' }] },
         center: [100.5, 13.7],
         zoom: 7,
         attributionControl: false,
@@ -1415,6 +1411,52 @@ var AdvancedQuery = (function () {
   }
 
   // ═══════════════════════════════════════════════
+  // Column Visibility Toggle
+  // ═══════════════════════════════════════════════
+  function toggleColumnsDropdown() {
+    var dd = document.getElementById("aqColDropdown");
+    if (!dd) return;
+    if (dd.style.display !== "none") {
+      dd.style.display = "none";
+      return;
+    }
+    var allCols = state.columns.filter(function (c) {
+      return c.key !== "_doc_id" && c.key !== "password";
+    });
+    var html = "";
+    for (var i = 0; i < allCols.length; i++) {
+      var key = allCols[i].key;
+      var checked = !state.hiddenColumns[key] ? " checked" : "";
+      html += '<label class="aq-col-item">' +
+        '<input type="checkbox" data-col="' + esc(key) + '"' + checked + '> ' +
+        esc(key) + "</label>";
+    }
+    html += '<div class="aq-col-reset"><button onclick="AdvancedQuery._resetColumns()">กลับค่าตั้งต้น</button></div>';
+    dd.innerHTML = html;
+
+    var checkboxes = dd.querySelectorAll('input[type="checkbox"]');
+    for (var ci = 0; ci < checkboxes.length; ci++) {
+      checkboxes[ci].addEventListener("change", function () {
+        var colKey = this.getAttribute("data-col");
+        if (this.checked) {
+          delete state.hiddenColumns[colKey];
+        } else {
+          state.hiddenColumns[colKey] = true;
+        }
+        updateGrid();
+      });
+    }
+    dd.style.display = "";
+  }
+
+  function resetColumns() {
+    state.hiddenColumns = {};
+    var dd = document.getElementById("aqColDropdown");
+    if (dd) dd.style.display = "none";
+    updateGrid();
+  }
+
+  // ═══════════════════════════════════════════════
   // Public Interface
   // ═══════════════════════════════════════════════
   return {
@@ -1428,5 +1470,7 @@ var AdvancedQuery = (function () {
     _nextPage: nextPage,
     _lastPage: lastPage,
     _setView: setView,
+    _toggleColumns: toggleColumnsDropdown,
+    _resetColumns: resetColumns,
   };
 })();

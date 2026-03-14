@@ -552,7 +552,7 @@ function renderMultiBranchTable(results) {
 /* MAP — Layer Toggle + Satellite Basemap         */
 /* ═══════════════════════════════════════════════ */
 var BASEMAPS = {
-    osm: { name: 'OpenStreetMap', style: { version: 8, sources: { osm: { type: 'raster', tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'], tileSize: 256 } }, layers: [{ id: 'osm', type: 'raster', source: 'osm' }] } },
+    osm: { name: 'OpenStreetMap', style: { version: 8, sources: { osm: { type: 'raster', tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'], tileSize: 256, attribution: '&copy; OpenStreetMap' } }, layers: [{ id: 'osm', type: 'raster', source: 'osm' }] } },
     satellite: { name: 'Satellite', style: { version: 8, sources: { sat: { type: 'raster', tiles: ['https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}'], tileSize: 256 } }, layers: [{ id: 'sat', type: 'raster', source: 'sat' }] } }
 };
 

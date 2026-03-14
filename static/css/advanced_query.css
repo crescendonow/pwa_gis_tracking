@@ -406,6 +406,7 @@
 }
 
 .aq-grid-toolbar {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -445,11 +446,11 @@
 /* AG Grid dark theme overrides */
 .aq-grid.ag-theme-alpine-dark {
   --ag-background-color: var(--surface-1);
-  --ag-header-background-color: var(--surface-2);
+  --ag-header-background-color: #3F74CA;
   --ag-odd-row-background-color: rgba(255, 255, 255, 0.02);
   --ag-row-hover-color: rgba(59, 130, 246, 0.08);
   --ag-border-color: var(--border);
-  --ag-header-foreground-color: var(--text-secondary);
+  --ag-header-foreground-color: #FFFFFF;
   --ag-foreground-color: var(--text-primary);
   --ag-font-size: 12px;
   --ag-row-height: 32px;
@@ -578,14 +579,15 @@
   font-size: 12px;
 }
 .aq-fallback-table th {
-  background: var(--surface-2);
+  background: linear-gradient(180deg, #4A90D9 0%, #3F74CA 100%);
   padding: 6px 8px;
   text-align: left;
   font-weight: 600;
-  color: var(--text-secondary);
-  border-bottom: 1px solid var(--border);
+  color: #FFFFFF;
+  border-bottom: none;
   position: sticky;
   top: 0;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.15);
 }
 .aq-fallback-table td {
   padding: 5px 8px;
@@ -650,6 +652,54 @@
   flex: 1;
   min-height: 300px;
   position: relative;
+}
+
+/* ── Column Toggle Dropdown ── */
+.aq-col-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 80px;
+  z-index: 200;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  max-height: 320px;
+  overflow-y: auto;
+  min-width: 220px;
+  padding: 8px 0;
+}
+.aq-col-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--text-primary);
+}
+.aq-col-item:hover {
+  background: rgba(59, 130, 246, 0.08);
+}
+.aq-col-item input {
+  accent-color: var(--pwa-blue);
+}
+.aq-col-reset {
+  margin: 4px 8px;
+  padding: 6px 0;
+  border-top: 1px solid var(--border);
+  text-align: center;
+}
+.aq-col-reset button {
+  font-size: 11px;
+  color: var(--pwa-blue);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+.aq-col-reset button:hover {
+  text-decoration: underline;
 }
 
 /* ── Animations ── */

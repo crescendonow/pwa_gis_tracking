@@ -379,7 +379,7 @@
         class="max-w-screen-2xl mx-auto px-4 py-3 flex items-center justify-between"
       >
         <div class="nav-brand">
-          <div class="logo-icon"><img src="/pwa_gis_tracking/static/images/pwa-logo.jpg" alt="PWA" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;"></div>
+          <div class="logo-icon"><img src="/pwa_gis_tracking/static/images/PWA_logo_text.svg" alt="PWA" style="width:100%;height:100%;object-fit:contain;border-radius:inherit;"></div>
           <div>
             <h1>PWA GIS Online Tracking</h1>
             <span>ระบบติดตามข้อมูล GIS ออนไลน์</span>
@@ -399,11 +399,7 @@
           <a href="/pwa_gis_tracking/detail" class="nav-link active"
             ><i class="fa-solid fa-file-lines"></i> รายละเอียด</a
           >
-          <span
-            id="navUserName"
-            class="text-xs"
-            style="color: var(--text-muted)"
-          ></span>
+          <span id="navUserName"></span>
           <a href="/pwa_gis_tracking/logout" class="nav-link" title="ออกจากระบบ"
             ><i class="fa-solid fa-right-from-bracket"></i
           ></a>
@@ -757,8 +753,8 @@
       class="max-w-screen-2xl mx-auto px-4 py-6 text-center relative z-10"
     >
       <p class="text-xs" style="color: var(--text-muted)">
-        PWA GIS Online Tracking Dashboard © 2025 — Provincial Waterworks
-        Authority
+        สงวนลิขสิทธิ์ พ.ศ. 2569 กองเทคโนโลยีสารสนเทศระบบประปา | การประปาส่วนภูมิภาค<br>
+        อยู่ในระหว่างการพัฒนาระบบโดย: งานข้อมูลภูมิสารสนเทศ | กองเทคโนโลยีสารสนเทศระบบประปา โทร: 02-551-8752
       </p>
     </footer>
 
@@ -793,7 +789,7 @@
         </div>
         <div class="chatbot-header-text">
           <div class="chatbot-title">น้องหนึ่งน้ำ</div>
-          <div class="chatbot-subtitle">ผู้ช่วย GIS </div>
+          <div class="chatbot-subtitle">ผู้ช่วย GIS (อยู่ในระหว่างการพัฒนา)</div>
         </div>
         <button onclick="toggleChatbot()" class="chatbot-close">&times;</button>
       </div>
@@ -804,14 +800,14 @@
             สวัสดีค่ะ! สอบถามข้อมูล GIS กับน้องหนึ่งน้ำได้เลยค่ะ
             <br /><br />ตัวอย่างคำถาม:
             <ul>
-              <li onclick="askSuggestion('แสดงตำแหน่งหัวดับเพลิงทั้งหมด')">แสดงตำแหน่งหัวดับเพลิงทั้งหมด</li>
-              <li onclick="askSuggestion('จำนวนมาตรวัดน้ำทั้งหมดในสาขา')">จำนวนมาตรวัดน้ำทั้งหมดในสาขา</li>
-              <li onclick="askSuggestion('ท่อขนาด 100 มม. ยาวรวมกี่เมตร')">ท่อขนาด 100 มม. ยาวรวมกี่เมตร</li>
+              <li onclick="askSuggestion('แสดงตำแหน่งหัวดับเพลิงทั้งหมดสาขาหนองเรือ')">แสดงตำแหน่งหัวดับเพลิงทั้งหมดสาขาหนองเรือ</li>
+              <li onclick="askSuggestion('จำนวนมาตรวัดน้ำทั้งหมดในสาขาเชียงใหม่')">จำนวนมาตรวัดน้ำทั้งหมดในสาขาเชียงใหม่</li>
+              <li onclick="askSuggestion('ท่อขนาด 100 มม. สาขาหาดใหญ่ ยาวรวมกี่เมตร')">ท่อขนาด 100 มม. สาขาหาดใหญ่ ยาวรวมกี่เมตร</li>
               <li onclick="askSuggestion('ขอรายชื่อสาขาทั้งหมดในเขต 2')">ขอรายชื่อสาขาทั้งหมดในเขต 2</li>
-              <li onclick="askSuggestion('จำนวนมาตรตายรายสาขา')">จำนวนมาตรตายรายสาขา</li>
-              <li onclick="askSuggestion('จำนวนจุดซ่อมท่อขนาด 100 ขึ้นไปแยกตามชนิด')">จุดซ่อมท่อขนาด 100 ขึ้นไปแยกตามชนิด</li>
-              <li onclick="askSuggestion('ความยาวท่อจ่ายน้ำขนาด 100 ขึ้นไป อายุมากกว่า 30 ปี')">ท่อจ่ายน้ำขนาด 100 อายุมากกว่า 30 ปี</li>
-              <li onclick="askSuggestion('ข้อมูลสถานีผลิตโรงกรองน้ำ')">ข้อมูลสถานีผลิต/โรงกรองน้ำ</li>
+              <li onclick="askSuggestion('จำนวนมาตรตายสาขารังสิต')">จำนวนมาตรตายสาขารังสิต</li>
+              <li onclick="askSuggestion('จำนวนจุดซ่อมท่อขนาด 100 ขึ้นไปแยกตามชนิด ขนาด สาขารังสิต')">จำนวนจุดซ่อมท่อขนาด 100 ขึ้นไปแยกตามชนิด ขนาด สาขารังสิต</li>
+              <li onclick="askSuggestion('ความยาวท่อจ่ายน้ำขนาด 100 ขึ้นไป อายุมากกว่า 30 ปี สาขาพัทยา')">ความยาวท่อจ่ายน้ำขนาด 100 ขึ้นไป อายุมากกว่า 30 ปี สาขาพัทยา</li>
+              <li onclick="askSuggestion('แสดงตำแหน่งข้อมูลสถานีผลิตโรงกรองน้ำทุกสาขา')">แสดงตำแหน่งข้อมูลสถานีผลิตโรงกรองน้ำทุกสาขา</li>
             </ul>
           </div>
         </div>

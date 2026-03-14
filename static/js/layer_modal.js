@@ -49,7 +49,8 @@ var LayerModal = (function() {
         suggestTimer: null,
         suggestIdx: -1,
         facets: [],
-        facetFilters: {}
+        facetFilters: {},
+        hiddenColumns: {}
     };
 
     var modalEl = null;
@@ -73,7 +74,9 @@ var LayerModal = (function() {
                         '<span class="lm-title" id="lmTitle">ข้อมูลชั้นข้อมูล</span>' +
                         '<span class="lm-badge" id="lmBadge">0 records</span>' +
                     '</div>' +
+                    '<button class="lm-btn" id="lmColToggle" onclick="LayerModal.toggleColumns()" title="เลือก Columns">&#9881; Columns</button>' +
                     '<button class="lm-close" onclick="LayerModal.close()" title="ปิด">&times;</button>' +
+                    '<div class="lm-col-dropdown" id="lmColDropdown" style="display:none"></div>' +
                 '</div>' +
                 /* Toolbar */
                 '<div class="lm-toolbar">' +
@@ -183,6 +186,17 @@ var LayerModal = (function() {
             if (e.key === 'Escape' && modalEl && modalEl.style.display !== 'none') close();
         });
 
+        // Close column dropdown when clicking outside it
+        document.addEventListener('click', function(e) {
+            var dd = document.getElementById('lmColDropdown');
+            var toggleBtn = document.getElementById('lmColToggle');
+            if (dd && dd.style.display !== 'none' &&
+                !dd.contains(e.target) &&
+                toggleBtn && !toggleBtn.contains(e.target)) {
+                dd.style.display = 'none';
+            }
+        });
+
         injectStyles();
     }
 
@@ -201,12 +215,20 @@ var LayerModal = (function() {
             '.lm-dialog{background:var(--surface-1,#FFFFFF);border:1px solid var(--border,rgba(0,0,0,0.08));border-radius:16px;width:96vw;max-width:1300px;max-height:92vh;display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(0,0,0,0.12);animation:lmUp .25s ease}',
             '@keyframes lmUp{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}',
             /* Header */
-            '.lm-header{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--border,rgba(0,0,0,0.08))}',
+            '.lm-header{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--border,rgba(0,0,0,0.08));position:relative}',
             '.lm-header-left{display:flex;align-items:center;gap:10px;min-width:0}',
             '.lm-title{font-size:15px;font-weight:700;color:var(--text-primary,#1A1A1A);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
             '.lm-badge{font-size:11px;padding:3px 10px;border-radius:12px;background:rgba(62,186,150,0.12);color:#15866B;font-weight:600;white-space:nowrap}',
             '.lm-close{background:none;border:none;color:var(--text-muted,#757575);font-size:24px;cursor:pointer;padding:4px 8px;border-radius:8px;line-height:1;transition:all .15s}',
             '.lm-close:hover{color:#2E2E2E;background:rgba(0,0,0,0.04)}',
+            /* Column toggle dropdown */
+            '.lm-col-dropdown{position:absolute;top:48px;right:60px;z-index:200;background:#fff;border:1px solid var(--border,rgba(0,0,0,0.08));border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.12);max-height:320px;overflow-y:auto;min-width:220px;padding:8px 0}',
+            '.lm-col-item{display:flex;align-items:center;gap:8px;padding:5px 12px;font-size:12px;cursor:pointer;color:var(--text-primary,#1A1A1A)}',
+            '.lm-col-item:hover{background:rgba(63,116,202,0.06)}',
+            '.lm-col-item input{accent-color:#3F74CA}',
+            '.lm-col-reset{margin:4px 8px 4px;padding:6px 0;border-top:1px solid var(--border,rgba(0,0,0,0.08));text-align:center}',
+            '.lm-col-reset button{font-size:11px;color:#3F74CA;background:none;border:none;cursor:pointer;padding:4px 8px}',
+            '.lm-col-reset button:hover{text-decoration:underline}',
             /* Toolbar */
             '.lm-toolbar{display:flex;align-items:center;gap:12px;padding:10px 20px;border-bottom:1px solid var(--border,rgba(0,0,0,0.06));flex-wrap:wrap}',
             '.lm-search-wrap{position:relative;flex:1;min-width:200px}',
@@ -218,7 +240,7 @@ var LayerModal = (function() {
             '.lm-table-wrap{flex:1;overflow:auto}',
             '.lm-table{width:100%;border-collapse:collapse;font-size:12px}',
             '.lm-table thead{position:sticky;top:0;z-index:2}',
-            '.lm-table th{background:var(--surface-2,#F6F6F6);color:var(--text-secondary,#4A4A4A);padding:8px 10px;text-align:left;font-weight:700;font-size:11px;white-space:nowrap;border-bottom:2px solid var(--pwa-blue,#3F74CA);letter-spacing:.3px;position:relative;user-select:none}',
+            '.lm-table th{background:linear-gradient(180deg,#4A90D9 0%,#3F74CA 100%);color:#fff;padding:8px 10px;text-align:left;font-weight:700;font-size:11px;white-space:nowrap;border-bottom:none;letter-spacing:.3px;position:relative;user-select:none;text-shadow:0 1px 2px rgba(0,0,0,0.15)}',
             '.lm-resize-handle{position:absolute;right:0;top:0;bottom:0;width:5px;cursor:col-resize;z-index:3}',
             '.lm-resize-handle:hover,.lm-resize-handle.active{background:var(--pwa-blue,#3F74CA)}',
             '.lm-table td{padding:6px 10px;border-bottom:1px solid var(--border,rgba(0,0,0,0.06));color:var(--text-primary,#1A1A1A);white-space:nowrap;max-width:280px;overflow:hidden;text-overflow:ellipsis}',
@@ -301,6 +323,7 @@ var LayerModal = (function() {
         state.sortSpec = null;
         state.facets = [];
         state.facetFilters = {};
+        state.hiddenColumns = {};
 
         document.getElementById('lmTitle').textContent =
             state.layerDisplayName + ' — สาขา ' + state.pwaCode;
@@ -434,7 +457,7 @@ var LayerModal = (function() {
 
         // Columns: use API columns, filter out hidden ones
         var cols = state.columns.filter(function(c) {
-            return c.key !== 'password' && c.key !== '_doc_id';
+            return c.key !== 'password' && c.key !== '_doc_id' && !state.hiddenColumns[c.key];
         });
 
         // Fallback: auto-detect from first data row
@@ -1019,6 +1042,54 @@ var LayerModal = (function() {
     }
 
     // ==========================================
+    // Column Visibility Toggle
+    // ==========================================
+    function toggleColumnDropdown() {
+        var dd = document.getElementById('lmColDropdown');
+        if (!dd) return;
+        if (dd.style.display !== 'none') {
+            dd.style.display = 'none';
+            return;
+        }
+        // Build dropdown content
+        var allCols = state.columns.filter(function(c) {
+            return c.key !== 'password' && c.key !== '_doc_id';
+        });
+        var html = '';
+        for (var i = 0; i < allCols.length; i++) {
+            var key = allCols[i].key;
+            var checked = !state.hiddenColumns[key] ? ' checked' : '';
+            html += '<label class="lm-col-item">' +
+                '<input type="checkbox" data-col="' + esc(key) + '"' + checked + '> ' +
+                esc(key) + '</label>';
+        }
+        html += '<div class="lm-col-reset"><button onclick="LayerModal.resetColumns()">กลับค่าตั้งต้น</button></div>';
+        dd.innerHTML = html;
+
+        // Attach change listeners
+        var checkboxes = dd.querySelectorAll('input[type="checkbox"]');
+        for (var ci = 0; ci < checkboxes.length; ci++) {
+            checkboxes[ci].addEventListener('change', function() {
+                var colKey = this.getAttribute('data-col');
+                if (this.checked) {
+                    delete state.hiddenColumns[colKey];
+                } else {
+                    state.hiddenColumns[colKey] = true;
+                }
+                render();
+            });
+        }
+        dd.style.display = '';
+    }
+
+    function resetColumns() {
+        state.hiddenColumns = {};
+        var dd = document.getElementById('lmColDropdown');
+        if (dd) dd.style.display = 'none';
+        render();
+    }
+
+    // ==========================================
     // Expose
     // ==========================================
     return {
@@ -1027,7 +1098,9 @@ var LayerModal = (function() {
         nextPage: nextPage,
         prevPage: prevPage,
         firstPage: firstPage,
-        lastPage: lastPage
+        lastPage: lastPage,
+        toggleColumns: toggleColumnDropdown,
+        resetColumns: resetColumns
     };
 
 })();

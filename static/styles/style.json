@@ -1,0 +1,3841 @@
+{
+  "braring": 0,
+  "center": [98.611389, 18.19246],
+  "glyphs": "http://192.168.246.235/core/tiles/fonts/{fontstack}/{range}.pbf",
+  "layers": [
+    {
+      "id": "background",
+      "layout": {
+        "visibility": "visible"
+      },
+      "metadata": {
+        "vallaris:group": "osm:basemap"
+      },
+      "paint": {
+        "background-color": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          0,
+          "rgba(255, 255, 255, 1)",
+          7,
+          "rgba(243, 247, 229, 1)",
+          12,
+          "rgba(242, 239, 233, 0.49)",
+          22,
+          "rgba(251, 250, 250, 1)"
+        ]
+      },
+      "type": "background"
+    },
+    {
+      "id": "satellite",
+      "layout": {
+        "visibility": "none"
+      },
+      "maxzoom": 22,
+      "metadata": {
+        "vallaris:group": "satellite:basemap"
+      },
+      "minzoom": 0,
+      "source": "satellite",
+      "type": "raster"
+    },
+    {
+      "filter": [
+        "all",
+        ["==", "$type", "Polygon"],
+        ["==", "class", "residential"]
+      ],
+      "id": "landuse-residential",
+      "layout": {
+        "visibility": "visible"
+      },
+      "metadata": {
+        "vallaris:group": "osm:basemap"
+      },
+      "paint": {
+        "fill-color": "rgba(247, 239, 212, 0.59)",
+        "fill-opacity": 0.6
+      },
+      "source": "osm",
+      "source-layer": "landuse",
+      "type": "fill"
+    },
+    {
+      "filter": ["==", "class", "grass"],
+      "id": "landcover_grass",
+      "layout": {
+        "visibility": "visible"
+      },
+      "metadata": {
+        "vallaris:group": "osm:basemap"
+      },
+      "paint": {
+        "fill-color": "rgba(140, 237, 203, 0.66)",
+        "fill-opacity": 0.45
+      },
+      "source": "osm",
+      "source-layer": "landcover",
+      "type": "fill"
+    },
+    {
+      "id": "park",
+      "layout": {
+        "visibility": "visible"
+      },
+      "metadata": {
+        "vallaris:group": "osm:basemap"
+      },
+      "paint": {
+        "fill-color": "#d8e8c8",
+        "fill-opacity": 1
+      },
+      "source": "osm",
+      "source-layer": "park",
+      "type": "fill"
+    },
+    {
+      "filter": ["==", "class", "wood"],
+      "id": "landcover_wood",
+      "layout": {
+        "visibility": "visible"
+      },
+      "metadata": {
+        "vallaris:group": "osm:basemap"
+      },
+      "paint": {
+        "fill-color": "#d8e8c8",
+        "fill-opacity": {
+          "base": 1,
+          "stops": [
+            [8, 0.6],
+            [22, 1]
+          ]
+        }
+      },
+      "source": "osm",
+      "source-layer": "landcover",
+      "type": "fill"
+    },
+    {
+      "filter": ["==", "subclass", "ice_shelf"],
+      "id": "landcover-ice-shelf",
+      "layout": {
+        "visibility": "visible"
+      },
+      "metadata": {
+        "vallaris:group": "osm:basemap"
+      },
+      "paint": {
+        "fill-color": "hsl(47, 26%, 88%)",
+        "fill-opacity": 0.8
+      },
+      "source": "osm",
+      "source-layer": "landcover",
+      "type": "fill"
+    },
+    {
+      "filter": ["==", "$type", "Polygon"],
+      "id": "water",
+      "layout": {
+        "visibility": "visible"
+      },
+      "metadata": {
+        "vallaris:group": "osm:basemap"
+      },
+      "paint": {
+        "fill-color": "hsl(205, 56%, 73%)",
+        "fill-opacity": 1
+      },
+      "source": "osm",
+      "source-layer": "water",
+      "type": "fill"
+    },
+    {
+      "filter": ["==", "subclass", "glacier"],
+      "id": "landcover-glacier",
+      "layout": {
+        "visibility": "visible"
+      },
+      "metadata": {
+        "vallaris:group": "osm:basemap"
+      },
+      "paint": {
+        "fill-color": "hsl(47, 22%, 94%)",
+        "fill-opacity": {
+          "base": 1,
+          "stops": [
+            [0, 1],
+            [8, 0.5]
+          ]
+        }
+      },
+      "source": "osm",
+      "source-layer": "landcover",
+      "type": "fill"
+    },
+    {
+      "filter": ["all", ["in", "class", "sand"]],
+      "id": "landcover_sand",
+      "layout": {
+        "visibility": "visible"
+      },
+      "metadata": {
+        "vallaris:group": "osm:basemap"
+      },
+      "paint": {
+        "fill-antialias": false,
+        "fill-color": "rgba(232, 214, 38, 1)",
+        "fill-opacity": 0.3
+      },
+      "source": "osm",
+      "source-layer": "landcover",
+      "type": "fill"
+    },
+    {
+      "filter": ["all", ["==", "class", "pitch"]],
+      "id": "landuse_pitch",
+      "layout": {
+        "visibility": "visible"
+      },
+      "metadata": {
+        "vallaris:group": "osm:basemap"
+      },
+      "paint": {
+        "fill-color": "rgba(214, 243, 195, 0.85)"
+      },
+      "source": "osm",
+      "source-layer": "landuse",
+      "type": "fill"
+    },
+    {
+      "filter": ["all", ["==", "class", "university"]],
+      "id": "landuse_university",
+      "layout": {
+        "visibility": "visible"
+      },
+      "metadata": {
+        "vallaris:group": "osm:basemap"
+      },
+      "paint": {
+        "fill-color": "rgba(247, 232, 186, 0.46)"
+      },
+      "source": "osm",
+      "source-layer": "landuse",
+      "type": "fill"
+    },
+    {
+      "filter": ["all", ["==", "class", "school"]],
+      "id": "landuse_school",
+      "layout": {
+        "visibility": "visible"
+      },
+      "metadata": {
+        "vallaris:group": "osm:basemap"
+      },
+      "paint": {
+        "fill-color": "rgba(247, 232, 186, 0.46)",
+        "fill-opacity": 0.5
+      },
+      "source": "osm",
+      "source-layer": "landuse",
+      "type": "fill"
+    },
+    {
+      "filter": ["all", ["==", "class", "hospital"]],
+      "id": "landuse_hospital",
+      "layout": {
+        "visibility": "visible"
+      },
+      "metadata": {
+        "vallaris:group": "osm:basemap"
+      },
+      "paint": {
+        "fill-color": "rgba(255, 222, 238, 0.24)"
+      },
+      "source": "osm",
+      "source-layer": "landuse",
+      "type": "fill"
+    },
+    {
+      "filter": ["==", "class", "agriculture"],
+      "id": "landuse_agriculture",
+      "layout": {
+        "visibility": "visible"
+      },
+      "metadata": {
+        "vallaris:group": "osm:basemap"
+      },
+      "paint": {
+        "fill-color": "#eae0d0"
+      },
+      "source": "osm",
+      "source-layer": "landuse",
+      "type": "fill"
+    },
+    {
+      "filter": ["==", "class", "national_park"],
+      "id": "landuse_overlay_national_park",
+      "layout": {
+        "visibility": "visible"
+      },
+      "metadata": {
+        "vallaris:group": "osm:basemap"
+      },
+      "paint": {
+        "fill-color": "#E1EBB0",
+        "fill-opacity": {
+          "base": 1,
+          "stops": [
+            [5, 0],
+            [9, 0.75]
+          ]
+        }
+      },
+      "source": "osm",
+      "source-layer": "landcover",
+      "type": "fill"
+    },
+    {
+      "id": "park_outline",
+      "layout": {
+        "visibility": "visible"
+      },
+      "metadata": {
+        "vallaris:group": "osm:basemap"
+      },
+      "paint": {
+        "line-color": "rgba(159, 183, 118, 0.69)",
+        "line-dasharray": [0.5, 1]
+      },
+      "source": "osm",
+      "source-layer": "park",
+      "type": "line"
+    },
+    {
+      "filter": [
+        "all",
+        ["==", "$type", "LineString"],
+        ["==", "brunnel", "tunnel"]
+      ],
+      "id": "waterway-tunnel",
+      "layout": {
+        "visibility": "visible"
+      },
+      "metadata": {
+        "vallaris:group": "osm:basemap"
+      },
+      "paint": {
+        "line-color": "hsl(205, 56%, 73%)",
+        "line-dasharray": [3, 3],
+        "line-gap-width": {
+          "stops": [
+            [12, 0],
+            [20, 6]
+          ]
+        },
+        "line-opacity": 1,
+        "line-width": {
+          "base": 1.4,
+          "stops": [
+            [8, 1],
+            [20, 2]
+          ]
+        }
+      },
+      "source": "osm",
+      "source-layer": "waterway",
+      "type": "line"
+    },
+    {
+      "filter": [
+        "all",
+        ["==", "$type", "LineString"],
+        ["!in", "brunnel", "tunnel", "bridge"]
+      ],
+      "id": "waterway",
+      "layout": {
+        "visibility": "visible"
+      },
+      "metadata": {
+        "vallaris:group": "osm:basemap"
+      },
+      "paint": {
+        "line-color": "hsl(205, 56%, 73%)",
+        "line-opacity": 1,
+        "line-width": {
+          "base": 1.4,
+          "stops": [
+            [8, 1],
+            [20, 8]
+          ]
+        }
+      },
+      "source": "osm",
+      "source-layer": "waterway",
+      "type": "line"
+    },
+    {
+      "filter": [
+        "all",
+        ["==", "$type", "LineString"],
+        ["==", "brunnel", "tunnel"],
+        ["==", "class", "transit"]
+      ],
+      "id": "tunnel_railway_transit",
+      "layout": {
+        "line-cap": "butt",
+        "line-join": "miter",
+        "visibility": "visible"
+      },
+      "metadata": {
+        "vallaris:group": "osm:basemap"
+      },
+      "minzoom": 0,
+      "paint": {
+        "line-color": "rgba(47, 69, 197, 1)",
+        "line-dasharray": [1, 0],
+        "line-opacity": {
+          "base": 1,
+          "stops": [
+            [11, 0],
+            [16, 1]
+          ]
+        },
+        "line-width": 3.5
+      },
+      "source": "osm",
+      "source-layer": "transportation",
+      "type": "line"
+    },
+    {
+      "id": "building",
+      "layout": {
+        "visibility": "none"
+      },
+      "metadata": {
+        "vallaris:group": "osm:basemap"
+      },
+      "paint": {
+        "fill-antialias": true,
+        "fill-color": "hsl(35, 8%, 85%)",
+        "fill-opacity": {
+          "base": 1,
+          "stops": [
+            [13, 0],
+            [15, 1]
+          ]
+        },
+        "fill-outline-color": {
+          "stops": [
+            [15, "rgba(236, 231, 231, 1)"],
+            [16, "rgba(236, 231, 231, 1)"]
+          ]
+        }
+      },
+      "source": "osm",
+      "source-layer": "building",
+      "type": "fill"
+    },
+    {
+      "filter": ["==", "$type", "Point"],
+      "id": "housenumber",
+      "layout": {
+        "text-field": "{housenumber}",
+        "text-font": ["Kanit"],
+        "text-size": 8,
+        "visibility": "visible"
+      },
+      "metadata": {
+        "vallaris:group": "osm:basemap"
+      },
+      "minzoom": 17,
+      "paint": {
+        "text-color": "rgba(212, 177, 146, 1)"
+      },
+      "source": "osm",
+      "source-layer": "housenumber",
+      "type": "symbol"
+    },
+    {
+      "filter": [
+        "all",
+        ["==", "$type", "Polygon"],
+        ["in", "brunnel", "bridge"]
+      ],
+      "id": "road_bridge_area",
+      "layout": {
+        "visibility": "visible"
+      },
+      "metadata": {
+        "vallaris:group": "osm:basemap"
+      },
+      "paint": {
+        "fill-color": "hsl(47, 26%, 88%)",
+        "fill-opacity": 0.5
+      },
+      "source": "osm",
+      "source-layer": "transportation",
+      "type": "fill"
+    },
+    {
+      "filter": [
+        "all",
+        ["==", "$type", "LineString"],
+        ["in", "class", "path", "track"]
+      ],
+      "id": "road_path",
+      "layout": {
+        "line-cap": "square",
+        "line-join": "bevel",
+        "visibility": "visible"
+      },
+      "metadata": {
+        "vallaris:group": "osm:basemap"
+      },
+      "paint": {
+        "line-color": "rgba(215, 212, 212, 0.29)",
+        "line-dasharray": [1, 1],
+        "line-width": {
+          "base": 1.55,
+          "stops": [
+            [4, 0.25],
+            [20, 8]
+          ]
+        }
+      },
+      "source": "osm",
+      "source-layer": "transportation",
+      "type": "line"
+    },
+    {
+      "filter": ["all", ["==", "class", "ferry"]],
+      "id": "road_ferry",
+      "layout": {
+        "line-cap": "round",
+        "line-join": "round",
+        "visibility": "visible"
+      },
+      "metadata": {
+        "vallaris:group": "osm:basemap"
+      },
+      "minzoom": 13,
+      "paint": {
+        "line-color": "rgba(208, 151, 151, 0.5)",
+        "line-dasharray": [1, 2],
+        "line-width": {
+          "base": 1.55,
+          "stops": [
+            [4, 0.25],
+            [20, 5]
+          ]
+        }
+      },
+      "source": "osm",
+      "source-layer": "transportation",
+      "type": "line"
+    },
+    {
+      "filter": [
+        "all",
+        ["==", "$type", "LineString"],
+        ["in", "class", "minor", "service"]
+      ],
+      "id": "road_minor",
+      "layout": {
+        "line-cap": "round",
+        "line-join": "round",
+        "visibility": "visible"
+      },
+      "maxzoom": 14,
+      "metadata": {
+        "vallaris:group": "osm:basemap"
+      },
+      "minzoom": 0,
+      "paint": {
+        "line-color": "rgba(222, 208, 208, 0.41)",
+        "line-width": {
+          "base": 1.55,
+          "stops": [
+            [4, 0.25],
+            [20, 10]
+          ]
+        }
+      },
+      "source": "osm",
+      "source-layer": "transportation",
+      "type": "line"
+    },
+    {
+      "filter": [
+        "all",
+        ["==", "$type", "LineString"],
+        ["==", "brunnel", "tunnel"],
+        ["==", "class", "minor_road"]
+      ],
+      "id": "tunnel_minor",
+      "layout": {
+        "line-cap": "butt",
+        "line-join": "miter",
+        "visibility": "visible"
+      },
+      "metadata": {
+        "vallaris:group": "osm:basemap"
+      },
+      "paint": {
+        "line-color": "#efefef",
+        "line-dasharray": [0.36, 0.18],
+        "line-width": {
+          "base": 1.55,
+          "stops": [
+            [4, 0.25],
+            [20, 30]
+          ]
+        }
+      },
+      "source": "osm",
+      "source-layer": "transportation",
+      "type": "line"
+    },
+    {
+      "filter": [
+        "all",
+        ["==", "$type", "LineString"],
+        ["==", "brunnel", "tunnel"],
+        ["in", "class", "primary", "secondary", "tertiary", "trunk"]
+      ],
+      "id": "tunnel_major",
+      "layout": {
+        "line-cap": "butt",
+        "line-join": "miter",
+        "visibility": "visible"
+      },
+      "metadata": {
+        "vallaris:group": "osm:basemap"
+      },
+      "paint": {
+        "line-color": "#fff",
+        "line-dasharray": [0.28, 0.14],
+        "line-width": {
+          "base": 1.4,
+          "stops": [
+            [6, 0.5],
+            [20, 30]
+          ]
+        }
+      },
+      "source": "osm",
+      "source-layer": "transportation",
+      "type": "line"
+    },
+    {
+      "filter": [
+        "all",
+        ["==", "$type", "Polygon"],
+        ["in", "class", "runway", "taxiway"]
+      ],
+      "id": "aeroway-area",
+      "layout": {
+        "visibility": "visible"
+      },
+      "metadata": {
+        "mapbox:group": "1444849345966.4436",
+        "vallaris:group": "osm:basemap"
+      },
+      "minzoom": 4,
+      "paint": {
+        "fill-color": "rgba(255, 255, 255, 1)",
+        "fill-opacity": {
+          "base": 1,
+          "stops": [
+            [13, 0],
+            [14, 1]
+          ]
+        }
+      },
+      "source": "osm",
+      "source-layer": "aeroway",
+      "type": "fill"
+    },
+    {
+      "filter": [
+        "all",
+        ["in", "class", "taxiway"],
+        ["==", "$type", "LineString"]
+      ],
+      "id": "aeroway-taxiway",
+      "layout": {
+        "line-cap": "round",
+        "line-join": "round",
+        "visibility": "visible"
+      },
+      "metadata": {
+        "mapbox:group": "1444849345966.4436",
+        "vallaris:group": "osm:basemap"
+      },
+      "minzoom": 12,
+      "paint": {
+        "line-color": "rgba(255, 255, 255, 1)",
+        "line-opacity": 1,
+        "line-width": {
+          "base": 1.5,
+          "stops": [
+            [12, 1],
+            [17, 10]
+          ]
+        }
+      },
+      "source": "osm",
+      "source-layer": "aeroway",
+      "type": "line"
+    },
+    {
+      "filter": [
+        "all",
+        ["in", "class", "runway"],
+        ["==", "$type", "LineString"]
+      ],
+      "id": "aeroway-runway",
+      "layout": {
+        "line-cap": "round",
+        "line-join": "round",
+        "visibility": "visible"
+      },
+      "metadata": {
+        "mapbox:group": "1444849345966.4436",
+        "vallaris:group": "osm:basemap"
+      },
+      "minzoom": 4,
+      "paint": {
+        "line-color": "rgba(249, 244, 244, 0.75)",
+        "line-opacity": 1,
+        "line-width": {
+          "base": 1.5,
+          "stops": [
+            [11, 4],
+            [17, 50]
+          ]
+        }
+      },
+      "source": "osm",
+      "source-layer": "aeroway",
+      "type": "line"
+    },
+    {
+      "filter": [
+        "all",
+        ["==", "$type", "LineString"],
+        ["in", "class", "trunk", "primary"]
+      ],
+      "id": "road_trunk_primary",
+      "layout": {
+        "line-cap": "round",
+        "line-join": "round",
+        "visibility": "visible"
+      },
+      "maxzoom": 14,
+      "metadata": {
+        "vallaris:group": "osm:basemap"
+      },
+      "minzoom": 0,
+      "paint": {
+        "line-color": "rgba(255, 204, 136, 0.86)",
+        "line-width": {
+          "base": 1.4,
+          "stops": [
+            [6, 0.5],
+            [20, 30]
+          ]
+        }
+      },
+      "source": "osm",
+      "source-layer": "transportation",
+      "type": "line"
+    },
+    {
+      "filter": [
+        "all",
+        ["==", "$type", "LineString"],
+        ["in", "class", "secondary", "tertiary"]
+      ],
+      "id": "road_secondary_tertiary",
+      "layout": {
+        "line-cap": "round",
+        "line-join": "round",
+        "visibility": "visible"
+      },
+      "maxzoom": 14,
+      "metadata": {
+        "vallaris:group": "osm:basemap"
+      },
+      "minzoom": 0,
+      "paint": {
+        "line-blur": 2,
+        "line-color": "rgba(255, 204, 136, 0.86)",
+        "line-width": {
+          "base": 1.4,
+          "stops": [
+            [6, 0.5],
+            [20, 20]
+          ]
+        }
+      },
+      "source": "osm",
+      "source-layer": "transportation",
+      "type": "line"
+    },
+    {
+      "filter": [
+        "all",
+        ["==", "$type", "LineString"],
+        ["==", "class", "motorway"]
+      ],
+      "id": "road_major_motorway",
+      "layout": {
+        "line-cap": "round",
+        "line-join": "round",
+        "visibility": "visible"
+      },
+      "metadata": {
+        "vallaris:group": "osm:basemap"
+      },
+      "paint": {
+        "line-color": "rgba(255, 167, 74, 0.71)",
+        "line-offset": 0,
+        "line-width": {
+          "base": 1.4,
+          "stops": [
+            [8, 1],
+            [16, 10]
+          ]
+        }
+      },
+      "source": "osm",
+      "source-layer": "transportation",
+      "type": "line"
+    },
+    {
+      "filter": ["all", ["==", "oneway", -1]],
+      "id": "road_oneway_opposite",
+      "layout": {
+        "icon-image": "oneway",
+        "icon-padding": 2,
+        "icon-rotate": 180,
+        "icon-rotation-alignment": "map",
+        "icon-size": {
+          "stops": [
+            [15, 0.5],
+            [19, 1]
+          ]
+        },
+        "symbol-placement": "line",
+        "symbol-spacing": 200,
+        "text-font": ["Kanit", "Kanit"],
+        "text-size": 8,
+        "visibility": "visible"
+      },
+      "metadata": {
+        "vallaris:group": "osm:basemap"
+      },
+      "minzoom": 15,
+      "paint": {
+        "icon-opacity": 0.5
+      },
+      "source": "osm",
+      "source-layer": "transportation",
+      "type": "symbol"
+    },
+    {
+      "filter": [
+        "all",
+        ["==", "class", "transit"],
+        ["!=", "brunnel", "tunnel"]
+      ],
+      "id": "railway-transit",
+      "layout": {
+        "visibility": "visible"
+      },
+      "metadata": {
+        "vallaris:group": "osm:basemap"
+      },
+      "paint": {
+        "line-color": "rgba(31, 150, 13, 1)",
+        "line-opacity": {
+          "base": 1,
+          "stops": [
+            [11, 0],
+            [16, 1]
+          ]
+        },
+        "line-width": 2.5
+      },
+      "source": "osm",
+      "source-layer": "transportation",
+      "type": "line"
+    },
+    {
+      "filter": ["==", "class", "rail"],
+      "id": "railway",
+      "layout": {
+        "visibility": "visible"
+      },
+      "metadata": {
+        "vallaris:group": "osm:basemap"
+      },
+      "paint": {
+        "line-blur": 0,
+        "line-color": "rgba(117, 115, 112, 1)",
+        "line-offset": 0,
+        "line-opacity": 1,
+        "line-pattern": "",
+        "line-width": 1.5
+      },
+      "source": "osm",
+      "source-layer": "transportation",
+      "type": "line"
+    },
+    {
+      "filter": [
+        "all",
+        ["==", "$type", "LineString"],
+        ["==", "brunnel", "bridge"]
+      ],
+      "id": "waterway-bridge-case",
+      "layout": {
+        "line-cap": "butt",
+        "line-join": "miter",
+        "visibility": "visible"
+      },
+      "metadata": {
+        "vallaris:group": "osm:basemap"
+      },
+      "paint": {
+        "line-color": "#bbbbbb",
+        "line-gap-width": {
+          "base": 1.55,
+          "stops": [
+            [4, 0.25],
+            [20, 30]
+          ]
+        },
+        "line-width": {
+          "base": 1.6,
+          "stops": [
+            [12, 0.5],
+            [20, 10]
+          ]
+        }
+      },
+      "source": "osm",
+      "source-layer": "waterway",
+      "type": "line"
+    },
+    {
+      "filter": [
+        "all",
+        ["==", "$type", "LineString"],
+        ["==", "brunnel", "bridge"]
+      ],
+      "id": "waterway-bridge",
+      "layout": {
+        "line-cap": "round",
+        "line-join": "round",
+        "visibility": "visible"
+      },
+      "metadata": {
+        "vallaris:group": "osm:basemap"
+      },
+      "paint": {
+        "line-color": "hsl(205, 56%, 73%)",
+        "line-width": {
+          "base": 1.55,
+          "stops": [
+            [4, 0.25],
+            [20, 30]
+          ]
+        }
+      },
+      "source": "osm",
+      "source-layer": "waterway",
+      "type": "line"
+    },
+    {
+      "filter": [
+        "all",
+        ["==", "$type", "LineString"],
+        ["==", "brunnel", "bridge"],
+        ["in", "class", "path", "pedestrian"]
+      ],
+      "id": "bridge_path_pedestrian_casing",
+      "layout": {
+        "visibility": "visible"
+      },
+      "metadata": {
+        "vallaris:group": "osm:basemap"
+      },
+      "paint": {
+        "line-color": "hsl(35, 6%, 80%)",
+        "line-dasharray": [1, 0],
+        "line-width": {
+          "base": 1.2,
+          "stops": [
+            [14, 1.5],
+            [20, 18]
+          ]
+        }
+      },
+      "source": "osm",
+      "source-layer": "transportation",
+      "type": "line"
+    },
+    {
+      "filter": [
+        "all",
+        ["==", "$type", "LineString"],
+        ["==", "brunnel", "bridge"],
+        ["in", "class", "path", "pedestrian"]
+      ],
+      "id": "bridge_path_pedestrian",
+      "layout": {
+        "visibility": "visible"
+      },
+      "metadata": {
+        "vallaris:group": "osm:basemap"
+      },
+      "paint": {
+        "line-color": "hsl(0, 0%, 100%)",
+        "line-dasharray": [1, 0.3],
+        "line-width": {
+          "base": 1.2,
+          "stops": [
+            [14, 0.5],
+            [20, 10]
+          ]
+        }
+      },
+      "source": "osm",
+      "source-layer": "transportation",
+      "type": "line"
+    },
+    {
+      "filter": [
+        "all",
+        ["==", "$type", "LineString"],
+        ["==", "brunnel", "bridge"],
+        ["==", "class", "minor_road"]
+      ],
+      "id": "bridge_minor case",
+      "layout": {
+        "line-cap": "butt",
+        "line-join": "miter",
+        "visibility": "visible"
+      },
+      "metadata": {
+        "vallaris:group": "osm:basemap"
+      },
+      "paint": {
+        "line-color": "#dedede",
+        "line-gap-width": {
+          "base": 1.55,
+          "stops": [
+            [4, 0.25],
+            [20, 30]
+          ]
+        },
+        "line-width": {
+          "base": 1.6,
+          "stops": [
+            [12, 0.5],
+            [20, 10]
+          ]
+        }
+      },
+      "source": "osm",
+      "source-layer": "transportation",
+      "type": "line"
+    },
+    {
+      "filter": [
+        "all",
+        ["==", "$type", "LineString"],
+        ["==", "brunnel", "bridge"],
+        ["in", "class", "primary", "secondary", "tertiary", "trunk"]
+      ],
+      "id": "bridge_major case",
+      "layout": {
+        "line-cap": "butt",
+        "line-join": "miter",
+        "visibility": "visible"
+      },
+      "maxzoom": 14,
+      "metadata": {
+        "vallaris:group": "osm:basemap"
+      },
+      "minzoom": 0,
+      "paint": {
+        "line-color": "rgba(244, 235, 235, 1)",
+        "line-gap-width": {
+          "base": 1.55,
+          "stops": [
+            [4, 0.25],
+            [20, 30]
+          ]
+        },
+        "line-width": {
+          "base": 1.6,
+          "stops": [
+            [12, 0.5],
+            [20, 10]
+          ]
+        }
+      },
+      "source": "osm",
+      "source-layer": "transportation",
+      "type": "line"
+    },
+    {
+      "filter": [
+        "all",
+        ["==", "$type", "LineString"],
+        ["==", "brunnel", "bridge"],
+        ["==", "class", "minor_road"]
+      ],
+      "id": "bridge_minor",
+      "layout": {
+        "line-cap": "round",
+        "line-join": "round",
+        "visibility": "visible"
+      },
+      "metadata": {
+        "vallaris:group": "osm:basemap"
+      },
+      "paint": {
+        "line-color": "#efefef",
+        "line-width": {
+          "base": 1.55,
+          "stops": [
+            [4, 0.25],
+            [20, 30]
+          ]
+        }
+      },
+      "source": "osm",
+      "source-layer": "transportation",
+      "type": "line"
+    },
+    {
+      "filter": [
+        "all",
+        ["==", "$type", "LineString"],
+        ["==", "brunnel", "bridge"],
+        ["in", "class", "primary", "secondary", "tertiary", "trunk"]
+      ],
+      "id": "bridge_major",
+      "layout": {
+        "line-cap": "round",
+        "line-join": "round",
+        "visibility": "visible"
+      },
+      "maxzoom": 14,
+      "metadata": {
+        "vallaris:group": "osm:basemap"
+      },
+      "minzoom": 0,
+      "paint": {
+        "line-color": "rgba(255, 255, 255, 0)",
+        "line-width": {
+          "base": 1.4,
+          "stops": [
+            [6, 0.5],
+            [20, 30]
+          ]
+        }
+      },
+      "source": "osm",
+      "source-layer": "transportation",
+      "type": "line"
+    },
+    {
+      "filter": ["all", ["in", "admin_level", 4, 6, 8], ["!=", "maritime", 1]],
+      "id": "admin_sub",
+      "layout": {
+        "line-miter-limit": 2,
+        "visibility": "visible"
+      },
+      "metadata": {
+        "vallaris:group": "osm:basemap"
+      },
+      "paint": {
+        "line-blur": 0,
+        "line-color": "rgba(148, 148, 148, 0.9)",
+        "line-dasharray": [4, 1.2],
+        "line-width": 0.7
+      },
+      "source": "osm",
+      "source-layer": "boundary",
+      "type": "line"
+    },
+    {
+      "filter": [
+        "all",
+        ["<=", "admin_level", 2],
+        ["==", "$type", "LineString"],
+        ["==", "maritime", 0]
+      ],
+      "id": "admin_country",
+      "layout": {
+        "line-cap": "round",
+        "line-join": "round",
+        "visibility": "visible"
+      },
+      "metadata": {
+        "vallaris:group": "osm:basemap"
+      },
+      "paint": {
+        "line-color": "rgba(56, 56, 56, 1)",
+        "line-width": {
+          "base": 1.3,
+          "stops": [
+            [3, 0.6],
+            [22, 15]
+          ]
+        }
+      },
+      "source": "osm",
+      "source-layer": "boundary",
+      "type": "line"
+    },
+    {
+      "id": "B5511012_PIPE_SERV",
+      "maxzoom": 22,
+      "metadata": {
+        "vallaris:group": "pipe"
+      },
+      "minzoom": 17,
+      "paint": {
+        "line-color": "rgba(142, 142, 142, 1)",
+        "line-dasharray": [2, 2],
+        "line-width": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          0,
+          0,
+          11,
+          0.2,
+          16.5,
+          1,
+          19.25,
+          1.3,
+          22,
+          1.5
+        ]
+      },
+      "source": "65d1c4136498e3e59b81f87b",
+      "source-layer": "65d1c4136498e3e59b81f87b",
+      "type": "line"
+    },
+    {
+      "filter": [
+        "any",
+        [
+          "!in",
+          "usetype",
+          "11",
+          "12",
+          "13",
+          "14",
+          "15",
+          "16",
+          "21",
+          "22",
+          "23",
+          "24",
+          "25",
+          "26",
+          "27",
+          "28",
+          "29",
+          "31",
+          "32",
+          "33",
+          "34",
+          "35",
+          "36",
+          "37",
+          "38",
+          "39"
+        ]
+      ],
+      "id": "B5511012_BLDG_type4",
+      "layout": {
+        "visibility": "visible"
+      },
+      "maxzoom": 22,
+      "metadata": {
+        "vallaris:group": "bldg"
+      },
+      "minzoom": 14,
+      "paint": {
+        "fill-color": "rgba(255, 255, 255, 1)",
+        "fill-opacity": 1,
+        "fill-outline-color": "rgba(0, 0, 0, 1)"
+      },
+      "source": "65d1c4106498e3e59b81f877",
+      "source-layer": "65d1c4106498e3e59b81f877",
+      "type": "fill"
+    },
+    {
+      "filter": [
+        "any",
+        ["in", "usetype", "31", "32", "33", "34", "35", "36", "37", "38", "39"]
+      ],
+      "id": "B5511012_BLDG_type3",
+      "layout": {
+        "visibility": "visible"
+      },
+      "maxzoom": 22,
+      "metadata": {
+        "vallaris:group": "bldg"
+      },
+      "minzoom": 14,
+      "paint": {
+        "fill-color": "rgba(135, 198, 250, 1)",
+        "fill-opacity": 1,
+        "fill-outline-color": "rgba(129,129,129,1)"
+      },
+      "source": "65d1c4106498e3e59b81f877",
+      "source-layer": "65d1c4106498e3e59b81f877",
+      "type": "fill"
+    },
+    {
+      "filter": [
+        "any",
+        ["in", "usetype", "21", "22", "23", "24", "25", "26", "27", "28", "29"]
+      ],
+      "id": "B5511012_BLDG_type2",
+      "layout": {
+        "visibility": "visible"
+      },
+      "maxzoom": 22,
+      "metadata": {
+        "vallaris:group": "bldg"
+      },
+      "minzoom": 14,
+      "paint": {
+        "fill-color": "rgba(237, 185, 218, 1)",
+        "fill-opacity": 1,
+        "fill-outline-color": "rgba(129,129,129,1)"
+      },
+      "source": "65d1c4106498e3e59b81f877",
+      "source-layer": "65d1c4106498e3e59b81f877",
+      "type": "fill"
+    },
+    {
+      "filter": ["any", ["in", "usetype", "11", "12", "13", "14", "15", "16"]],
+      "id": "B5511012_BLDG_type1",
+      "layout": {
+        "visibility": "visible"
+      },
+      "maxzoom": 22,
+      "metadata": {
+        "vallaris:group": "bldg"
+      },
+      "minzoom": 14,
+      "paint": {
+        "fill-color": "rgba(244, 252, 149, 1)",
+        "fill-opacity": 1,
+        "fill-outline-color": "rgba(129,129,129,1)"
+      },
+      "source": "65d1c4106498e3e59b81f877",
+      "source-layer": "65d1c4106498e3e59b81f877",
+      "type": "fill"
+    },
+    {
+      "filter": ["all", ["==", "$type", "Point"], ["==", "rank", 1]],
+      "id": "poi_label",
+      "layout": {
+        "icon-size": 1,
+        "text-anchor": "top",
+        "text-field": "{name:latin}\n{name:nonlatin}",
+        "text-font": ["Kanit"],
+        "text-max-width": 8,
+        "text-offset": [0, 0.5],
+        "text-size": 11,
+        "visibility": "visible"
+      },
+      "metadata": {
+        "vallaris:group": "osm:basemap"
+      },
+      "minzoom": 14,
+      "paint": {
+        "text-color": "#666",
+        "text-halo-blur": 1,
+        "text-halo-color": "rgba(255,255,255,0.75)",
+        "text-halo-width": 1
+      },
+      "source": "osm",
+      "source-layer": "poi",
+      "type": "symbol"
+    },
+    {
+      "filter": ["all", ["has", "iata"]],
+      "id": "airport-label",
+      "layout": {
+        "icon-image": "airport_11",
+        "icon-size": 1,
+        "text-anchor": "top",
+        "text-field": "{name:latin}\n{name:nonlatin}",
+        "text-font": ["Kanit"],
+        "text-max-width": 8,
+        "text-offset": [0, 0.5],
+        "text-size": 8,
+        "visibility": "visible"
+      },
+      "metadata": {
+        "vallaris:group": "osm:basemap"
+      },
+      "minzoom": 10,
+      "paint": {
+        "text-color": "#666",
+        "text-halo-blur": 1,
+        "text-halo-color": "rgba(255,255,255,0.75)",
+        "text-halo-width": 1
+      },
+      "source": "osm",
+      "source-layer": "aerodrome_label",
+      "type": "symbol"
+    },
+    {
+      "filter": ["==", "$type", "LineString"],
+      "id": "road_major_label",
+      "layout": {
+        "symbol-placement": "line",
+        "text-field": "{name:latin} {name:nonlatin}",
+        "text-font": ["Kanit"],
+        "text-letter-spacing": 0.1,
+        "text-rotation-alignment": "map",
+        "text-size": {
+          "base": 1.4,
+          "stops": [
+            [10, 8],
+            [20, 10]
+          ]
+        },
+        "text-transform": "uppercase",
+        "visibility": "visible"
+      },
+      "maxzoom": 14,
+      "metadata": {
+        "vallaris:group": "osm:basemap"
+      },
+      "minzoom": 0,
+      "paint": {
+        "text-color": "#000",
+        "text-halo-color": "hsl(0, 0%, 100%)",
+        "text-halo-width": 2
+      },
+      "source": "osm",
+      "source-layer": "transportation_name",
+      "type": "symbol"
+    },
+    {
+      "filter": ["all", ["==", "$type", "Point"], ["==", "class", "city"]],
+      "id": "place_label_city",
+      "layout": {
+        "text-field": "{name:latin}\n{name:nonlatin}",
+        "text-font": ["Kanit"],
+        "text-max-width": 10,
+        "text-size": {
+          "stops": [
+            [3, 8],
+            [8, 10]
+          ]
+        },
+        "visibility": "visible"
+      },
+      "maxzoom": 16,
+      "metadata": {
+        "vallaris:group": "osm:basemap"
+      },
+      "paint": {
+        "text-color": "hsl(0, 0%, 0%)",
+        "text-halo-blur": 0,
+        "text-halo-color": "hsla(0, 0%, 100%, 0.75)",
+        "text-halo-width": 2
+      },
+      "source": "osm",
+      "source-layer": "place",
+      "type": "symbol"
+    },
+    {
+      "filter": [
+        "all",
+        ["==", "$type", "Point"],
+        ["==", "class", "country"],
+        ["!has", "iso_a2"]
+      ],
+      "id": "country_label-other",
+      "layout": {
+        "text-field": "{name:latin}",
+        "text-font": ["Noto Sans Regular"],
+        "text-max-width": 10,
+        "text-size": {
+          "stops": [
+            [3, 12],
+            [8, 22]
+          ]
+        },
+        "visibility": "visible"
+      },
+      "maxzoom": 12,
+      "metadata": {
+        "vallaris:group": "osm:basemap"
+      },
+      "paint": {
+        "text-color": "hsl(0, 0%, 13%)",
+        "text-halo-blur": 0,
+        "text-halo-color": "rgba(255,255,255,0.75)",
+        "text-halo-width": 2
+      },
+      "source": "osm",
+      "source-layer": "place",
+      "type": "symbol"
+    },
+    {
+      "filter": [
+        "all",
+        ["==", "$type", "Point"],
+        ["==", "class", "country"],
+        ["has", "iso_a2"]
+      ],
+      "id": "country_label",
+      "layout": {
+        "text-field": "{name:latin}\n{name:nonlatin}",
+        "text-font": ["Kanit", "Kanit"],
+        "text-max-width": 10,
+        "text-size": {
+          "stops": [
+            [3, 10],
+            [8, 22]
+          ]
+        },
+        "visibility": "visible"
+      },
+      "maxzoom": 12,
+      "metadata": {
+        "vallaris:group": "osm:basemap"
+      },
+      "paint": {
+        "text-color": "hsl(0, 0%, 13%)",
+        "text-halo-blur": 0,
+        "text-halo-color": "rgba(255,255,255,0.75)",
+        "text-halo-width": 2
+      },
+      "source": "osm",
+      "source-layer": "place",
+      "type": "symbol"
+    },
+    {
+      "filter": ["all", ["in", "class", "bus", "rail", "airport"]],
+      "id": "poi_transit",
+      "layout": {
+        "icon-image": "{class}_11",
+        "text-anchor": "left",
+        "text-field": "{name:latin} {name:nonlatin}",
+        "text-font": ["Kanit"],
+        "text-max-width": 9,
+        "text-offset": [0.9, 0],
+        "text-size": {
+          "stops": [
+            [10, 6],
+            [15, 8],
+            [22, 9]
+          ]
+        },
+        "visibility": "visible"
+      },
+      "metadata": {
+        "vallaris:group": "osm:basemap"
+      },
+      "minzoom": 14,
+      "paint": {
+        "icon-color": "rgba(66, 64, 64, 1)",
+        "icon-opacity": 0.7,
+        "text-color": "#666",
+        "text-halo-blur": 0.5,
+        "text-halo-color": "#ffffff",
+        "text-halo-width": 1
+      },
+      "source": "osm",
+      "source-layer": "poi",
+      "type": "symbol"
+    },
+    {
+      "filter": [
+        "all",
+        ["==", "$type", "Point"],
+        [">=", "rank", 1],
+        ["<", "rank", 7]
+      ],
+      "id": "poi_z14",
+      "layout": {
+        "icon-image": "{class}_11",
+        "text-anchor": "top",
+        "text-field": "{name_en} {name:nonlatin}",
+        "text-font": ["Kanit"],
+        "text-max-width": 9,
+        "text-offset": [0, 0.6],
+        "text-size": {
+          "stops": [
+            [10, 6],
+            [15, 8],
+            [22, 9]
+          ]
+        },
+        "visibility": "visible"
+      },
+      "metadata": {
+        "vallaris:group": "osm:basemap"
+      },
+      "minzoom": 14,
+      "paint": {
+        "icon-color": "rgba(66, 64, 64, 1)",
+        "icon-opacity": 0.7,
+        "text-color": "#666",
+        "text-halo-blur": 0.5,
+        "text-halo-color": "#ffffff",
+        "text-halo-width": 1
+      },
+      "source": "osm",
+      "source-layer": "poi",
+      "type": "symbol"
+    },
+    {
+      "filter": [
+        "all",
+        ["==", "$type", "Point"],
+        [">=", "rank", 7],
+        ["<", "rank", 20]
+      ],
+      "id": "poi_z15",
+      "layout": {
+        "icon-image": "{class}_11",
+        "text-anchor": "top",
+        "text-field": "{name_en} {name:nonlatin}",
+        "text-font": ["Kanit"],
+        "text-max-width": 9,
+        "text-offset": [0, 0.6],
+        "text-size": {
+          "stops": [
+            [2, 6],
+            [10, 8],
+            [15, 9]
+          ]
+        },
+        "visibility": "visible"
+      },
+      "metadata": {
+        "vallaris:group": "osm:basemap"
+      },
+      "minzoom": 15,
+      "paint": {
+        "icon-color": "rgba(66, 64, 64, 1)",
+        "icon-opacity": 0.7,
+        "text-color": "#666",
+        "text-halo-blur": 0.5,
+        "text-halo-color": "#ffffff",
+        "text-halo-width": 1
+      },
+      "source": "osm",
+      "source-layer": "poi",
+      "type": "symbol"
+    },
+    {
+      "filter": ["all", ["==", "$type", "Point"], [">=", "rank", 20]],
+      "id": "poi_z16",
+      "layout": {
+        "icon-image": "{class}_11",
+        "text-anchor": "top",
+        "text-field": "{name_en} {name:nonlatin}",
+        "text-font": ["Kanit"],
+        "text-max-width": 9,
+        "text-offset": [0, 0.6],
+        "text-size": {
+          "stops": [
+            [10, 6],
+            [15, 8],
+            [22, 9]
+          ]
+        },
+        "visibility": "visible"
+      },
+      "metadata": {
+        "vallaris:group": "osm:basemap"
+      },
+      "minzoom": 16,
+      "paint": {
+        "icon-color": "rgba(66, 64, 64, 1)",
+        "icon-opacity": 0.7,
+        "text-color": "#666",
+        "text-halo-blur": 0.5,
+        "text-halo-color": "#ffffff",
+        "text-halo-width": 1
+      },
+      "source": "osm",
+      "source-layer": "poi",
+      "type": "symbol"
+    },
+    {
+      "filter": ["all"],
+      "id": "B5511012_PIPE_SIZE_16-40",
+      "layout": {
+        "line-cap": "round",
+        "line-join": "miter",
+        "visibility": "visible"
+      },
+      "maxzoom": 22,
+      "metadata": {
+        "vallaris:group": "pipe"
+      },
+      "minzoom": 10,
+      "paint": {
+        "line-color": [
+          "interpolate",
+          ["linear"],
+          ["get", "pipe_size"],
+          0,
+          "#FFCCFF",
+          40,
+          "#FFCCFF",
+          41,
+          "rgba(242, 242, 242, 0)"
+        ],
+        "line-translate-anchor": "map",
+        "line-width": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          0,
+          0,
+          11,
+          0.2,
+          16.5,
+          1,
+          19.25,
+          1.4,
+          22,
+          2
+        ]
+      },
+      "source": "65d1c4136498e3e59b81f87b",
+      "source-layer": "65d1c4136498e3e59b81f87b",
+      "type": "line"
+    },
+    {
+      "id": "B5511012_PIPE_SIZE_100-125-140",
+      "layout": {
+        "line-join": "miter",
+        "visibility": "visible"
+      },
+      "maxzoom": 22,
+      "metadata": {
+        "vallaris:group": "pipe"
+      },
+      "minzoom": 10,
+      "paint": {
+        "line-color": [
+          "step",
+          ["get", "pipe_size"],
+          "rgba(242, 242, 242, 0)",
+          99,
+          "#FFFF00",
+          125,
+          "#FFFF00",
+          140,
+          "rgba(242, 242, 242, 0)"
+        ],
+        "line-translate-anchor": "map",
+        "line-width": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          0,
+          0,
+          11,
+          0.2,
+          16.5,
+          1,
+          19.25,
+          1.4,
+          22,
+          2
+        ]
+      },
+      "source": "65d1c4136498e3e59b81f87b",
+      "source-layer": "65d1c4136498e3e59b81f87b",
+      "type": "line"
+    },
+    {
+      "filter": ["all"],
+      "id": "B5511012_PIPE_SIZE_50-90",
+      "layout": {
+        "line-cap": "round",
+        "line-join": "miter",
+        "visibility": "visible"
+      },
+      "maxzoom": 22,
+      "metadata": {
+        "vallaris:group": "pipe"
+      },
+      "minzoom": 10,
+      "paint": {
+        "line-color": [
+          "step",
+          ["get", "pipe_size"],
+          "rgba(242, 242, 242, 0)",
+          50,
+          "#CC0066",
+          90,
+          "rgba(242, 242, 242, 0)"
+        ],
+        "line-translate-anchor": "map",
+        "line-width": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          0,
+          0,
+          11,
+          0.2,
+          16.5,
+          1,
+          19.25,
+          1.4,
+          22,
+          2
+        ]
+      },
+      "source": "65d1c4136498e3e59b81f87b",
+      "source-layer": "65d1c4136498e3e59b81f87b",
+      "type": "line"
+    },
+    {
+      "filter": ["all"],
+      "id": "B5511012_PIPE_SIZE_150-160-180",
+      "layout": {
+        "line-cap": "round",
+        "line-join": "miter",
+        "visibility": "visible"
+      },
+      "maxzoom": 22,
+      "metadata": {
+        "vallaris:group": "pipe"
+      },
+      "minzoom": 10,
+      "paint": {
+        "line-color": [
+          "step",
+          ["get", "pipe_size"],
+          "rgba(242, 242, 242, 0)",
+          149,
+          "#339900",
+          160,
+          "#339900",
+          180,
+          "rgba(242, 242, 242, 0)"
+        ],
+        "line-translate-anchor": "map",
+        "line-width": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          0,
+          0,
+          11,
+          0.2,
+          16.5,
+          1,
+          19.25,
+          1.4,
+          22,
+          2
+        ]
+      },
+      "source": "65d1c4136498e3e59b81f87b",
+      "source-layer": "65d1c4136498e3e59b81f87b",
+      "type": "line"
+    },
+    {
+      "filter": ["all"],
+      "id": "B5511012_PIPE_SIZE_200-225",
+      "layout": {
+        "line-cap": "round",
+        "line-join": "miter",
+        "visibility": "visible"
+      },
+      "maxzoom": 22,
+      "metadata": {
+        "vallaris:group": "pipe"
+      },
+      "minzoom": 10,
+      "paint": {
+        "line-color": [
+          "step",
+          ["get", "pipe_size"],
+          "rgba(242, 242, 242, 0)",
+          199,
+          "#3300CC",
+          225,
+          "rgba(242, 242, 242, 0)"
+        ],
+        "line-translate-anchor": "map",
+        "line-width": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          0,
+          0,
+          11,
+          0.2,
+          16.5,
+          1,
+          19.25,
+          1.4,
+          22,
+          2
+        ]
+      },
+      "source": "65d1c4136498e3e59b81f87b",
+      "source-layer": "65d1c4136498e3e59b81f87b",
+      "type": "line"
+    },
+    {
+      "filter": ["all"],
+      "id": "B5511012_PIPE_SIZE_250-280",
+      "layout": {
+        "line-cap": "round",
+        "line-join": "miter",
+        "visibility": "visible"
+      },
+      "maxzoom": 22,
+      "metadata": {
+        "vallaris:group": "pipe"
+      },
+      "minzoom": 10,
+      "paint": {
+        "line-color": [
+          "step",
+          ["get", "pipe_size"],
+          "rgba(242, 242, 242, 0)",
+          249,
+          "#FF0000",
+          280,
+          "rgba(242, 242, 242, 0)"
+        ],
+        "line-translate-anchor": "map",
+        "line-width": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          0,
+          0,
+          11,
+          0.2,
+          16.5,
+          1,
+          19.25,
+          1.4,
+          22,
+          2
+        ]
+      },
+      "source": "65d1c4136498e3e59b81f87b",
+      "source-layer": "65d1c4136498e3e59b81f87b",
+      "type": "line"
+    },
+    {
+      "filter": ["all"],
+      "id": "B5511012_PIPE_SIZE_300-315",
+      "layout": {
+        "line-cap": "round",
+        "line-join": "miter",
+        "visibility": "visible"
+      },
+      "maxzoom": 22,
+      "metadata": {
+        "vallaris:group": "pipe"
+      },
+      "minzoom": 10,
+      "paint": {
+        "line-color": [
+          "step",
+          ["get", "pipe_size"],
+          "rgba(242, 242, 242, 0)",
+          299,
+          "#993300",
+          315,
+          "rgba(242, 242, 242, 0)"
+        ],
+        "line-translate-anchor": "map",
+        "line-width": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          0,
+          0,
+          11,
+          0.2,
+          16.5,
+          1,
+          19.25,
+          1.4,
+          22,
+          2
+        ]
+      },
+      "source": "65d1c4136498e3e59b81f87b",
+      "source-layer": "65d1c4136498e3e59b81f87b",
+      "type": "line"
+    },
+    {
+      "filter": ["all"],
+      "id": "B5511012_PIPE_SIZE_335-350",
+      "layout": {
+        "line-cap": "round",
+        "line-join": "miter",
+        "visibility": "visible"
+      },
+      "maxzoom": 22,
+      "metadata": {
+        "vallaris:group": "pipe"
+      },
+      "minzoom": 10,
+      "paint": {
+        "line-color": [
+          "step",
+          ["get", "pipe_size"],
+          "rgba(242, 242, 242, 0)",
+          334,
+          "#D989E5",
+          350,
+          "rgba(242, 242, 242, 0)"
+        ],
+        "line-translate-anchor": "map",
+        "line-width": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          0,
+          0,
+          11,
+          0.2,
+          16.5,
+          1,
+          19.25,
+          1.4,
+          22,
+          2
+        ]
+      },
+      "source": "65d1c4136498e3e59b81f87b",
+      "source-layer": "65d1c4136498e3e59b81f87b",
+      "type": "line"
+    },
+    {
+      "filter": ["all"],
+      "id": "B5511012_PIPE_SIZE_400",
+      "layout": {
+        "line-cap": "round",
+        "line-join": "miter",
+        "visibility": "visible"
+      },
+      "maxzoom": 22,
+      "metadata": {
+        "vallaris:group": "pipe"
+      },
+      "minzoom": 10,
+      "paint": {
+        "line-color": [
+          "match",
+          ["get", "pipe_size"],
+          400,
+          "#33FFFF",
+          "rgba(242, 242, 242, 0)"
+        ],
+        "line-translate-anchor": "map",
+        "line-width": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          0,
+          0,
+          11,
+          0.2,
+          16.5,
+          1,
+          19.25,
+          1.4,
+          22,
+          2
+        ]
+      },
+      "source": "65d1c4136498e3e59b81f87b",
+      "source-layer": "65d1c4136498e3e59b81f87b",
+      "type": "line"
+    },
+    {
+      "filter": ["all"],
+      "id": "B5511012_PIPE_SIZE_450",
+      "layout": {
+        "line-cap": "round",
+        "line-join": "miter",
+        "visibility": "visible"
+      },
+      "maxzoom": 22,
+      "metadata": {
+        "vallaris:group": "pipe"
+      },
+      "minzoom": 10,
+      "paint": {
+        "line-color": [
+          "match",
+          ["get", "pipe_size"],
+          450,
+          "#777",
+          "rgba(242, 242, 242, 0)"
+        ],
+        "line-translate-anchor": "map",
+        "line-width": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          0,
+          0,
+          11,
+          0.2,
+          16.5,
+          1,
+          19.25,
+          1.4,
+          22,
+          2
+        ]
+      },
+      "source": "65d1c4136498e3e59b81f87b",
+      "source-layer": "65d1c4136498e3e59b81f87b",
+      "type": "line"
+    },
+    {
+      "filter": ["all"],
+      "id": "B5511012_PIPE_SIZE_500-560",
+      "layout": {
+        "line-cap": "round",
+        "line-join": "miter",
+        "visibility": "visible"
+      },
+      "maxzoom": 22,
+      "metadata": {
+        "vallaris:group": "pipe"
+      },
+      "minzoom": 10,
+      "paint": {
+        "line-color": [
+          "match",
+          ["get", "pipe_size"],
+          500,
+          "#FF33FF",
+          560,
+          "#FF33FF",
+          "rgba(242, 242, 242, 0)"
+        ],
+        "line-translate-anchor": "map",
+        "line-width": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          0,
+          0,
+          11,
+          0.2,
+          16.5,
+          1,
+          19.25,
+          1.4,
+          22,
+          2
+        ]
+      },
+      "source": "65d1c4136498e3e59b81f87b",
+      "source-layer": "65d1c4136498e3e59b81f87b",
+      "type": "line"
+    },
+    {
+      "filter": ["all"],
+      "id": "B5511012_PIPE_SIZE_600-630",
+      "layout": {
+        "line-cap": "round",
+        "line-join": "miter",
+        "visibility": "visible"
+      },
+      "maxzoom": 22,
+      "metadata": {
+        "vallaris:group": "pipe"
+      },
+      "minzoom": 10,
+      "paint": {
+        "line-color": [
+          "match",
+          ["get", "pipe_size"],
+          600,
+          "#999900",
+          630,
+          "#999900",
+          "rgba(242, 242, 242, 0)"
+        ],
+        "line-translate-anchor": "map",
+        "line-width": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          0,
+          0,
+          11,
+          0.2,
+          16.5,
+          1,
+          19.25,
+          1.4,
+          22,
+          2
+        ]
+      },
+      "source": "65d1c4136498e3e59b81f87b",
+      "source-layer": "65d1c4136498e3e59b81f87b",
+      "type": "line"
+    },
+    {
+      "filter": ["all"],
+      "id": "B5511012_PIPE_SIZE_700-710",
+      "layout": {
+        "line-cap": "round",
+        "line-join": "miter",
+        "visibility": "visible"
+      },
+      "maxzoom": 22,
+      "metadata": {
+        "vallaris:group": "pipe"
+      },
+      "minzoom": 10,
+      "paint": {
+        "line-color": [
+          "match",
+          ["get", "pipe_size"],
+          700,
+          "#339999",
+          710,
+          "#339999",
+          "rgba(242, 242, 242, 0)"
+        ],
+        "line-translate-anchor": "map",
+        "line-width": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          0,
+          0,
+          11,
+          0.2,
+          16.5,
+          1,
+          19.25,
+          1.4,
+          22,
+          2
+        ]
+      },
+      "source": "65d1c4136498e3e59b81f87b",
+      "source-layer": "65d1c4136498e3e59b81f87b",
+      "type": "line"
+    },
+    {
+      "filter": ["all"],
+      "id": "B5511012_PIPE_SIZE_800",
+      "layout": {
+        "line-cap": "round",
+        "line-join": "miter",
+        "visibility": "visible"
+      },
+      "maxzoom": 22,
+      "metadata": {
+        "vallaris:group": "pipe"
+      },
+      "minzoom": 10,
+      "paint": {
+        "line-color": [
+          "match",
+          ["get", "pipe_size"],
+          800,
+          "#6666CC",
+          "rgba(242, 242, 242, 0)"
+        ],
+        "line-translate-anchor": "map",
+        "line-width": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          0,
+          0,
+          11,
+          0.2,
+          16.5,
+          1,
+          19.25,
+          1.4,
+          22,
+          2
+        ]
+      },
+      "source": "65d1c4136498e3e59b81f87b",
+      "source-layer": "65d1c4136498e3e59b81f87b",
+      "type": "line"
+    },
+    {
+      "filter": ["all"],
+      "id": "B5511012_PIPE_SIZE_900",
+      "layout": {
+        "line-cap": "round",
+        "line-join": "miter",
+        "visibility": "visible"
+      },
+      "maxzoom": 22,
+      "metadata": {
+        "vallaris:group": "pipe"
+      },
+      "minzoom": 10,
+      "paint": {
+        "line-color": [
+          "match",
+          ["get", "pipe_size"],
+          900,
+          "#990099",
+          "rgba(242, 242, 242, 0)"
+        ],
+        "line-translate-anchor": "map",
+        "line-width": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          0,
+          0,
+          11,
+          0.2,
+          16.5,
+          1,
+          19.25,
+          1.4,
+          22,
+          2
+        ]
+      },
+      "source": "65d1c4136498e3e59b81f87b",
+      "source-layer": "65d1c4136498e3e59b81f87b",
+      "type": "line"
+    },
+    {
+      "filter": ["all"],
+      "id": "B5511012_PIPE_SIZE_1000",
+      "layout": {
+        "line-cap": "round",
+        "line-join": "miter",
+        "visibility": "visible"
+      },
+      "maxzoom": 22,
+      "metadata": {
+        "vallaris:group": "pipe"
+      },
+      "minzoom": 10,
+      "paint": {
+        "line-color": [
+          "match",
+          ["get", "pipe_size"],
+          1000,
+          "#00FF09",
+          "rgba(242, 242, 242, 0)"
+        ],
+        "line-translate-anchor": "map",
+        "line-width": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          0,
+          0,
+          11,
+          0.2,
+          16.5,
+          1,
+          19.25,
+          1.4,
+          22,
+          2
+        ]
+      },
+      "source": "65d1c4136498e3e59b81f87b",
+      "source-layer": "65d1c4136498e3e59b81f87b",
+      "type": "line"
+    },
+    {
+      "filter": ["all"],
+      "id": "B5511012_PIPE_SIZE_more-1000",
+      "layout": {
+        "line-cap": "butt",
+        "line-join": "miter",
+        "visibility": "visible"
+      },
+      "maxzoom": 22,
+      "metadata": {
+        "vallaris:group": "pipe"
+      },
+      "minzoom": 10,
+      "paint": {
+        "line-color": [
+          "step",
+          ["get", "pipe_size"],
+          "rgba(255, 255, 255, 0)",
+          1001,
+          "rgba(0, 255, 68, 1)"
+        ],
+        "line-translate-anchor": "map",
+        "line-width": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          0,
+          0,
+          11,
+          0.2,
+          16.5,
+          1,
+          19.25,
+          1.4,
+          22,
+          2
+        ]
+      },
+      "source": "65d1c4136498e3e59b81f87b",
+      "source-layer": "65d1c4136498e3e59b81f87b",
+      "type": "line"
+    },
+    {
+      "id": "B5511012_PIPE_label",
+      "layout": {
+        "icon-allow-overlap": true,
+        "icon-ignore-placement": false,
+        "symbol-placement": "line",
+        "text-allow-overlap": false,
+        "text-anchor": "bottom",
+        "text-field": "ท่อ {pipe_type}  ขนาด  {pipe_size} มม.",
+        "text-font": ["Arial Unicode MS Regula "],
+        "text-size": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          0,
+          5,
+          11,
+          6,
+          16.5,
+          9,
+          19.25,
+          11,
+          22,
+          12
+        ]
+      },
+      "maxzoom": 22,
+      "metadata": {
+        "vallaris:group": "pipe"
+      },
+      "minzoom": 15,
+      "paint": {
+        "icon-color": "rgba(64, 64, 64, 1)",
+        "text-color": "rgba(64, 64, 64, 1)",
+        "text-halo-color": "rgba(255, 255, 255, 1)",
+        "text-halo-width": 1
+      },
+      "source": "65d1c4136498e3e59b81f87b",
+      "source-layer": "65d1c4136498e3e59b81f87b",
+      "type": "symbol"
+    },
+    {
+      "filter": [
+        "all",
+        ["==", "$type", "Point"],
+        ["!in", "class", "city", "state", "country", "continent"]
+      ],
+      "id": "place_label_other",
+      "layout": {
+        "icon-allow-overlap": true,
+        "text-allow-overlap": true,
+        "text-anchor": "center",
+        "text-field": "{name:latin}\n{name:nonlatin}",
+        "text-font": ["Kanit"],
+        "text-max-width": 6,
+        "text-size": {
+          "stops": [
+            [8, 9],
+            [12, 12]
+          ]
+        },
+        "visibility": "visible"
+      },
+      "maxzoom": 17,
+      "metadata": {
+        "vallaris:group": "osm:basemap"
+      },
+      "minzoom": 13,
+      "paint": {
+        "text-color": "hsl(0, 0%, 25%)",
+        "text-halo-blur": 0,
+        "text-halo-color": "hsl(0, 0%, 100%)",
+        "text-halo-width": 1.5
+      },
+      "source": "osm",
+      "source-layer": "place",
+      "type": "symbol"
+    },
+    {
+      "filter": ["all", ["!=", "addrno", "N/A"]],
+      "id": "B5511012_BLDG_ADDR",
+      "layout": {
+        "icon-allow-overlap": [
+          "step",
+          ["zoom"],
+          false,
+          11,
+          false,
+          13.99,
+          true,
+          22,
+          true
+        ],
+        "text-field": " {addrno}",
+        "text-font": ["Arial Unicode MS Regula "],
+        "text-ignore-placement": [
+          "step",
+          ["zoom"],
+          false,
+          11,
+          false,
+          13.99,
+          true,
+          22,
+          true
+        ],
+        "text-offset": [0, 0],
+        "text-size": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          0,
+          9,
+          11,
+          7.5,
+          16.5,
+          6.5,
+          22,
+          10
+        ],
+        "visibility": "visible"
+      },
+      "maxzoom": 22,
+      "metadata": {
+        "vallaris:group": "bldg"
+      },
+      "minzoom": 17,
+      "paint": {
+        "text-color": "rgba(64, 64, 64, 1)",
+        "text-halo-color": "rgba(255, 255, 255, 1)",
+        "text-halo-width": 0.8
+      },
+      "source": "65d1c4106498e3e59b81f877",
+      "source-layer": "65d1c4106498e3e59b81f877",
+      "type": "symbol"
+    },
+    {
+      "filter": ["all", ["==", "meterstat", 1]],
+      "id": "B5511012_METER-stat1",
+      "layout": {
+        "icon-allow-overlap": [
+          "step",
+          ["zoom"],
+          false,
+          11,
+          false,
+          13.99,
+          true,
+          22,
+          true
+        ],
+        "icon-ignore-placement": [
+          "step",
+          ["zoom"],
+          false,
+          9,
+          false,
+          13,
+          false,
+          17,
+          true,
+          22,
+          true
+        ],
+        "icon-image": "Meter,small",
+        "icon-size": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          0,
+          0.7,
+          11,
+          0.8,
+          16.5,
+          0.7,
+          22,
+          0.7
+        ],
+        "text-font": ["Kanit"],
+        "visibility": "visible"
+      },
+      "maxzoom": 22,
+      "metadata": {
+        "vallaris:group": "meter"
+      },
+      "minzoom": 17,
+      "source": "65d1c4126498e3e59b81f87a",
+      "source-layer": "65d1c4126498e3e59b81f87a",
+      "type": "symbol"
+    },
+    {
+      "filter": ["all", ["==", "meterstat", 1]],
+      "id": "B5511012_METER-stat1-Label",
+      "layout": {
+        "icon-allow-overlap": false,
+        "symbol-avoid-edges": false,
+        "text-allow-overlap": true,
+        "text-anchor": "top",
+        "text-field": " {meterno}",
+        "text-font": ["Arial Unicode MS Regula "],
+        "text-ignore-placement": false,
+        "text-justify": "center",
+        "text-keep-upright": false,
+        "text-line-height": 1.3,
+        "text-max-width": 20,
+        "text-offset": [0, 0],
+        "text-padding": 0,
+        "text-radial-offset": 1,
+        "text-rotate": 10,
+        "text-size": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          0,
+          5,
+          11,
+          14,
+          16.5,
+          13,
+          19.25,
+          11,
+          22,
+          11
+        ],
+        "visibility": "visible"
+      },
+      "maxzoom": 22,
+      "metadata": {
+        "vallaris:group": "meter"
+      },
+      "minzoom": 19.5,
+      "paint": {
+        "icon-halo-color": "rgba(255, 255, 255, 1)",
+        "icon-halo-width": 1,
+        "icon-opacity": 1,
+        "text-color": "rgba(64, 64, 64, 1)",
+        "text-halo-color": "rgba(255, 255, 255, 1)",
+        "text-halo-width": 1
+      },
+      "source": "65d1c4126498e3e59b81f87a",
+      "source-layer": "65d1c4126498e3e59b81f87a",
+      "type": "symbol"
+    },
+    {
+      "filter": ["all", ["==", "meterstat", 2]],
+      "id": "B5511012_METER-stat2",
+      "layout": {
+        "icon-allow-overlap": [
+          "step",
+          ["zoom"],
+          false,
+          11,
+          false,
+          13.99,
+          true,
+          22,
+          true
+        ],
+        "icon-ignore-placement": [
+          "step",
+          ["zoom"],
+          false,
+          9,
+          false,
+          13,
+          false,
+          17,
+          true,
+          22,
+          true
+        ],
+        "icon-image": "Meter,small,damaged",
+        "icon-size": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          0,
+          0.7,
+          11,
+          0.8,
+          16.5,
+          0.7,
+          22,
+          0.7
+        ],
+        "text-font": ["Kanit"],
+        "visibility": "visible"
+      },
+      "maxzoom": 22,
+      "metadata": {
+        "vallaris:group": "meter"
+      },
+      "minzoom": 17,
+      "source": "65d1c4126498e3e59b81f87a",
+      "source-layer": "65d1c4126498e3e59b81f87a",
+      "type": "symbol"
+    },
+    {
+      "filter": ["all", ["==", "meterstat", 2]],
+      "id": "B5511012_METER-stat2-Label",
+      "layout": {
+        "icon-allow-overlap": false,
+        "symbol-avoid-edges": false,
+        "text-allow-overlap": true,
+        "text-anchor": "top",
+        "text-field": " {meterno}",
+        "text-font": ["Arial Unicode MS Regula "],
+        "text-ignore-placement": false,
+        "text-offset": [0, 0],
+        "text-padding": 0,
+        "text-radial-offset": 1,
+        "text-rotate": 10,
+        "text-size": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          0,
+          5,
+          11,
+          14,
+          16.5,
+          8,
+          19.25,
+          8,
+          22,
+          9
+        ],
+        "visibility": "visible"
+      },
+      "maxzoom": 22,
+      "metadata": {
+        "vallaris:group": "meter"
+      },
+      "minzoom": 19.5,
+      "paint": {
+        "icon-halo-color": "rgba(255, 255, 255, 1)",
+        "icon-halo-width": 1,
+        "icon-opacity": 1,
+        "text-halo-color": "rgba(255, 255, 255, 1)",
+        "text-halo-width": 1
+      },
+      "source": "65d1c4126498e3e59b81f87a",
+      "source-layer": "65d1c4126498e3e59b81f87a",
+      "type": "symbol"
+    },
+    {
+      "filter": ["all", ["==", "meterstat", 3]],
+      "id": "B5511012_METER-stat3",
+      "layout": {
+        "icon-allow-overlap": [
+          "step",
+          ["zoom"],
+          false,
+          11,
+          false,
+          13.99,
+          true,
+          22,
+          true
+        ],
+        "icon-ignore-placement": [
+          "step",
+          ["zoom"],
+          false,
+          9,
+          false,
+          13,
+          false,
+          17,
+          true,
+          22,
+          true
+        ],
+        "icon-image": "Meter,small,dead",
+        "icon-size": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          0,
+          0.7,
+          11,
+          0.8,
+          16.5,
+          0.7,
+          22,
+          0.7
+        ],
+        "text-font": ["Kanit"],
+        "visibility": "visible"
+      },
+      "maxzoom": 22,
+      "metadata": {
+        "vallaris:group": "meter"
+      },
+      "minzoom": 17,
+      "source": "65d1c4126498e3e59b81f87a",
+      "source-layer": "65d1c4126498e3e59b81f87a",
+      "type": "symbol"
+    },
+    {
+      "filter": ["all", ["==", "meterstat", 3]],
+      "id": "B5511012_METER-stat3-Label",
+      "layout": {
+        "icon-allow-overlap": false,
+        "symbol-avoid-edges": false,
+        "text-allow-overlap": true,
+        "text-anchor": "top",
+        "text-field": " {meterno}",
+        "text-font": ["Arial Unicode MS Regula "],
+        "text-ignore-placement": false,
+        "text-offset": [0, 0],
+        "text-padding": 0,
+        "text-radial-offset": 1,
+        "text-rotate": 10,
+        "text-size": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          0,
+          5,
+          11,
+          14,
+          16.5,
+          8,
+          19.25,
+          8,
+          22,
+          9
+        ],
+        "visibility": "visible"
+      },
+      "maxzoom": 22,
+      "metadata": {
+        "vallaris:group": "meter"
+      },
+      "minzoom": 19.5,
+      "paint": {
+        "icon-halo-color": "rgba(255, 255, 255, 1)",
+        "icon-halo-width": 1,
+        "icon-opacity": 1,
+        "text-halo-color": "rgba(255, 255, 255, 1)",
+        "text-halo-width": 1
+      },
+      "source": "65d1c4126498e3e59b81f87a",
+      "source-layer": "65d1c4126498e3e59b81f87a",
+      "type": "symbol"
+    },
+    {
+      "id": "B5511012_LEAKPOINT",
+      "layout": {
+        "icon-allow-overlap": [
+          "step",
+          ["zoom"],
+          false,
+          11,
+          false,
+          13.99,
+          true,
+          22,
+          true
+        ],
+        "icon-ignore-placement": false,
+        "icon-image": "Leakpoint",
+        "icon-rotate": 0,
+        "icon-size": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          0,
+          2,
+          11,
+          1,
+          14,
+          0.5,
+          16.5,
+          0.6,
+          19.25,
+          0.8,
+          22,
+          0.7
+        ],
+        "text-font": ["Kanit"]
+      },
+      "maxzoom": 22,
+      "metadata": {
+        "vallaris:group": "leakpoint"
+      },
+      "minzoom": 16,
+      "source": "65d1c4116498e3e59b81f879",
+      "source-layer": "65d1c4116498e3e59b81f879",
+      "type": "symbol"
+    },
+    {
+      "id": "B5511012_LEAKPOINT-Label",
+      "layout": {
+        "icon-allow-overlap": [
+          "step",
+          ["zoom"],
+          false,
+          11,
+          true,
+          13.99,
+          true,
+          22,
+          true
+        ],
+        "icon-ignore-placement": false,
+        "icon-rotate": 0,
+        "icon-size": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          0,
+          2,
+          11,
+          1,
+          14,
+          0.5,
+          16.5,
+          0.6,
+          19.25,
+          0.8,
+          22,
+          0.7
+        ],
+        "text-field": " {leakcause}",
+        "text-font": ["Arial Unicode MS Regula "],
+        "text-ignore-placement": [
+          "step",
+          ["zoom"],
+          true,
+          11,
+          false,
+          18,
+          true,
+          22,
+          true
+        ],
+        "text-size": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          0,
+          5,
+          11,
+          5,
+          16.5,
+          9,
+          19.25,
+          11,
+          22,
+          12
+        ]
+      },
+      "maxzoom": 22,
+      "metadata": {
+        "vallaris:group": "leakpoint"
+      },
+      "minzoom": 16,
+      "paint": {
+        "icon-color": "rgba(33, 31, 31, 1)",
+        "text-color": "rgba(64, 64, 64, 1)",
+        "text-halo-color": "rgba(255, 255, 255, 1)",
+        "text-halo-width": 1,
+        "text-translate": [0, 10]
+      },
+      "source": "65d1c4116498e3e59b81f879",
+      "source-layer": "65d1c4116498e3e59b81f879",
+      "type": "symbol"
+    },
+    {
+      "id": "B5511012_PWA_WATERWORKS",
+      "layout": {
+        "icon-allow-overlap": [
+          "step",
+          ["zoom"],
+          false,
+          11,
+          false,
+          13.99,
+          true,
+          22,
+          true
+        ],
+        "icon-ignore-placement": false,
+        "icon-image": "PWA",
+        "icon-size": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          0,
+          0.8,
+          11,
+          0.7,
+          22,
+          0.7
+        ],
+        "text-font": ["Kanit"],
+        "visibility": "visible"
+      },
+      "maxzoom": 22,
+      "metadata": {
+        "vallaris:group": "pwa_waterworks"
+      },
+      "minzoom": 4,
+      "source": "65d1c4146498e3e59b81f87c",
+      "source-layer": "65d1c4146498e3e59b81f87c",
+      "type": "symbol"
+    },
+    {
+      "filter": ["all", ["==", "valve_type", 1]],
+      "id": "B5511012_VALVE_type1",
+      "layout": {
+        "icon-allow-overlap": [
+          "step",
+          ["zoom"],
+          false,
+          11,
+          false,
+          13.99,
+          true,
+          22,
+          true
+        ],
+        "icon-image": "Valve5",
+        "icon-size": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          0,
+          2,
+          11,
+          0.5,
+          14,
+          0.4,
+          16.5,
+          0.4,
+          19.25,
+          0.4,
+          22,
+          0.4
+        ],
+        "text-font": ["Kanit"]
+      },
+      "maxzoom": 22,
+      "metadata": {
+        "vallaris:group": "valve"
+      },
+      "minzoom": 14,
+      "source": "65d1c4146498e3e59b81f87d",
+      "source-layer": "65d1c4146498e3e59b81f87d",
+      "type": "symbol"
+    },
+    {
+      "filter": ["all", ["==", "valve_type", 2]],
+      "id": "B5511012_VALVE_type2",
+      "layout": {
+        "icon-allow-overlap": [
+          "step",
+          ["zoom"],
+          false,
+          11,
+          false,
+          13.99,
+          true,
+          22,
+          true
+        ],
+        "icon-image": "Valve1",
+        "icon-size": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          0,
+          2,
+          11,
+          0.4,
+          14,
+          0.4,
+          16.5,
+          0.5,
+          19.25,
+          0.6,
+          22,
+          0.5
+        ],
+        "text-font": ["Kanit"],
+        "visibility": "visible"
+      },
+      "maxzoom": 22,
+      "metadata": {
+        "vallaris:group": "valve"
+      },
+      "minzoom": 14,
+      "source": "65d1c4146498e3e59b81f87d",
+      "source-layer": "65d1c4146498e3e59b81f87d",
+      "type": "symbol"
+    },
+    {
+      "filter": ["all", ["==", "valve_type", 3]],
+      "id": "B5511012_VALVE_type3",
+      "layout": {
+        "icon-allow-overlap": [
+          "step",
+          ["zoom"],
+          false,
+          11,
+          false,
+          13.99,
+          true,
+          22,
+          true
+        ],
+        "icon-image": "Valve4",
+        "icon-size": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          0,
+          2,
+          11,
+          1,
+          14,
+          0.6,
+          16.5,
+          0.6,
+          19.25,
+          0.5,
+          22,
+          0.5
+        ],
+        "text-font": ["Kanit"],
+        "visibility": "visible"
+      },
+      "maxzoom": 22,
+      "metadata": {
+        "vallaris:group": "valve"
+      },
+      "minzoom": 14,
+      "source": "65d1c4146498e3e59b81f87d",
+      "source-layer": "65d1c4146498e3e59b81f87d",
+      "type": "symbol"
+    },
+    {
+      "filter": ["all", ["==", "valve_type", 4]],
+      "id": "B5511012_VALVE_type4",
+      "layout": {
+        "icon-allow-overlap": [
+          "step",
+          ["zoom"],
+          false,
+          11,
+          false,
+          13.99,
+          true,
+          22,
+          true
+        ],
+        "icon-image": "Valve2",
+        "icon-size": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          0,
+          2,
+          11,
+          1,
+          14,
+          0.6,
+          16.5,
+          0.6,
+          19.25,
+          0.5,
+          22,
+          0.5
+        ],
+        "text-font": ["Kanit"],
+        "visibility": "visible"
+      },
+      "maxzoom": 22,
+      "metadata": {
+        "vallaris:group": "valve"
+      },
+      "minzoom": 14,
+      "source": "65d1c4146498e3e59b81f87d",
+      "source-layer": "65d1c4146498e3e59b81f87d",
+      "type": "symbol"
+    },
+    {
+      "filter": ["all", ["==", "valve_type", 5]],
+      "id": "B5511012_VALVE_type5",
+      "layout": {
+        "icon-allow-overlap": [
+          "step",
+          ["zoom"],
+          false,
+          11,
+          false,
+          13.99,
+          true,
+          22,
+          true
+        ],
+        "icon-image": "Check Valve",
+        "icon-size": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          0,
+          2,
+          11,
+          1,
+          14,
+          0.6,
+          16.5,
+          0.6,
+          19.25,
+          0.5,
+          22,
+          0.5
+        ],
+        "text-font": ["Kanit"],
+        "visibility": "visible"
+      },
+      "maxzoom": 22,
+      "metadata": {
+        "vallaris:group": "valve"
+      },
+      "minzoom": 14,
+      "source": "65d1c4146498e3e59b81f87d",
+      "source-layer": "65d1c4146498e3e59b81f87d",
+      "type": "symbol"
+    },
+    {
+      "filter": ["all", ["==", "valve_type", 6]],
+      "id": "B5511012_VALVE_type6",
+      "layout": {
+        "icon-allow-overlap": [
+          "step",
+          ["zoom"],
+          false,
+          11,
+          false,
+          13.99,
+          true,
+          22,
+          true
+        ],
+        "icon-image": "Airvalve",
+        "icon-size": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          0,
+          2,
+          11,
+          0.7,
+          14,
+          0.6,
+          16.5,
+          0.6,
+          19.25,
+          0.57,
+          22,
+          0.57
+        ],
+        "text-font": ["Kanit"],
+        "visibility": "visible"
+      },
+      "maxzoom": 22,
+      "metadata": {
+        "vallaris:group": "valve"
+      },
+      "minzoom": 14,
+      "source": "65d1c4146498e3e59b81f87d",
+      "source-layer": "65d1c4146498e3e59b81f87d",
+      "type": "symbol"
+    },
+    {
+      "filter": ["all", ["==", "valve_type", 7]],
+      "id": "B5511012_VALVE_type7",
+      "layout": {
+        "icon-allow-overlap": [
+          "step",
+          ["zoom"],
+          false,
+          11,
+          false,
+          13.99,
+          true,
+          22,
+          true
+        ],
+        "icon-image": "prv",
+        "icon-size": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          0,
+          2,
+          11,
+          1,
+          14,
+          1,
+          16.5,
+          0.8,
+          19.25,
+          0.7,
+          22,
+          0.7
+        ],
+        "text-font": ["Kanit"]
+      },
+      "maxzoom": 22,
+      "metadata": {
+        "vallaris:group": "valve"
+      },
+      "minzoom": 14,
+      "source": "65d1c4146498e3e59b81f87d",
+      "source-layer": "65d1c4146498e3e59b81f87d",
+      "type": "symbol"
+    },
+    {
+      "filter": ["all", ["==", "valve_type", 8]],
+      "id": "B5511012_VALVE_type8",
+      "layout": {
+        "icon-allow-overlap": [
+          "step",
+          ["zoom"],
+          false,
+          11,
+          false,
+          13.99,
+          true,
+          22,
+          true
+        ],
+        "icon-image": "Blowoff",
+        "icon-size": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          0,
+          2,
+          11,
+          1,
+          14,
+          1,
+          16.5,
+          1,
+          19.25,
+          0.6,
+          22,
+          0.7
+        ],
+        "text-font": ["Kanit"]
+      },
+      "maxzoom": 22,
+      "metadata": {
+        "vallaris:group": "valve"
+      },
+      "minzoom": 14,
+      "source": "65d1c4146498e3e59b81f87d",
+      "source-layer": "65d1c4146498e3e59b81f87d",
+      "type": "symbol"
+    },
+    {
+      "filter": ["all", ["==", "valve_type", 9]],
+      "id": "B5511012_VALVE_type9",
+      "layout": {
+        "icon-allow-overlap": [
+          "step",
+          ["zoom"],
+          false,
+          11,
+          false,
+          13.99,
+          true,
+          22,
+          true
+        ],
+        "icon-image": "Valve99",
+        "icon-size": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          0,
+          2,
+          11,
+          0.7,
+          14,
+          0.5,
+          16.5,
+          0.6,
+          19.25,
+          0.6,
+          22,
+          0.5
+        ],
+        "text-font": ["Kanit"]
+      },
+      "maxzoom": 22,
+      "metadata": {
+        "vallaris:group": "valve"
+      },
+      "minzoom": 14,
+      "source": "65d1c4146498e3e59b81f87d",
+      "source-layer": "65d1c4146498e3e59b81f87d",
+      "type": "symbol"
+    },
+    {
+      "filter": ["all", ["==", "valve_type", 10]],
+      "id": "B5511012_VALVE_type10",
+      "layout": {
+        "icon-allow-overlap": [
+          "step",
+          ["zoom"],
+          false,
+          11,
+          false,
+          13.99,
+          true,
+          22,
+          true
+        ],
+        "icon-image": "Valve3",
+        "icon-size": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          0,
+          2,
+          11,
+          0.7,
+          14,
+          0.5,
+          16.5,
+          0.6,
+          19.25,
+          0.6,
+          22,
+          0.5
+        ],
+        "text-font": ["Kanit"]
+      },
+      "maxzoom": 22,
+      "metadata": {
+        "vallaris:group": "valve"
+      },
+      "minzoom": 14,
+      "source": "65d1c4146498e3e59b81f87d",
+      "source-layer": "65d1c4146498e3e59b81f87d",
+      "type": "symbol"
+    },
+    {
+      "filter": ["any", ["==", "fire_size", 75], ["==", "FIRE_SIZE", 75]],
+      "id": "B5511012_FIREHYDRANT-size75",
+      "layout": {
+        "icon-allow-overlap": [
+          "step",
+          ["zoom"],
+          false,
+          11,
+          false,
+          13.99,
+          true,
+          22,
+          true
+        ],
+        "icon-image": [
+          "case",
+          ["==", ["get", "fire_size"], 75],
+          "Firehydrant75",
+          ["==", ["get", "FIRE_SIZE"], 75],
+          "Firehydrant75",
+          ""
+        ],
+        "icon-size": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          0,
+          1,
+          11,
+          0.5,
+          22,
+          0.4
+        ],
+        "text-font": ["Kanit"],
+        "visibility": "visible"
+      },
+      "maxzoom": 22,
+      "metadata": {
+        "vallaris:group": "firehydrant"
+      },
+      "minzoom": 14,
+      "source": "65d1c4106498e3e59b81f878",
+      "source-layer": "65d1c4106498e3e59b81f878",
+      "type": "symbol"
+    },
+    {
+      "filter": ["any", ["==", "fire_size", 100], ["==", "FIRE_SIZE", "100"]],
+      "id": "B5511012_FIREHYDRANT-size100",
+      "layout": {
+        "icon-allow-overlap": [
+          "step",
+          ["zoom"],
+          false,
+          11,
+          false,
+          13.99,
+          true,
+          22,
+          true
+        ],
+        "icon-image": [
+          "case",
+          ["==", ["get", "fire_size"], 100],
+          "Firehydrant100",
+          ["==", ["get", "FIRE_SIZE"], 100],
+          "Firehydrant100",
+          ""
+        ],
+        "icon-size": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          0,
+          1,
+          11,
+          0.5,
+          22,
+          0.4
+        ],
+        "text-font": ["Kanit"],
+        "visibility": "visible"
+      },
+      "maxzoom": 22,
+      "metadata": {
+        "vallaris:group": "firehydrant"
+      },
+      "minzoom": 14,
+      "source": "65d1c4106498e3e59b81f878",
+      "source-layer": "65d1c4106498e3e59b81f878",
+      "type": "symbol"
+    },
+    {
+      "filter": ["any", ["==", "fire_size", 150], ["==", "FIRE_SIZE", 150]],
+      "id": "B5511012_FIREHYDRANT-size150",
+      "layout": {
+        "icon-allow-overlap": [
+          "step",
+          ["zoom"],
+          false,
+          11,
+          false,
+          13.99,
+          true,
+          22,
+          true
+        ],
+        "icon-image": [
+          "case",
+          ["==", ["get", "fire_size"], 150],
+          "Firehydrant150",
+          ["==", ["get", "FIRE_SIZE"], 150],
+          "Firehydrant150",
+          ""
+        ],
+        "icon-size": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          0,
+          1,
+          11,
+          0.5,
+          22,
+          0.4
+        ],
+        "text-font": ["Kanit"],
+        "visibility": "visible"
+      },
+      "maxzoom": 22,
+      "metadata": {
+        "vallaris:group": "firehydrant"
+      },
+      "minzoom": 14,
+      "source": "65d1c4106498e3e59b81f878",
+      "source-layer": "65d1c4106498e3e59b81f878",
+      "type": "symbol"
+    },
+    {
+      "id": "B5511012_PWA_WATERWORKS-Label",
+      "layout": {
+        "icon-allow-overlap": true,
+        "icon-ignore-placement": false,
+        "text-allow-overlap": true,
+        "text-anchor": "bottom",
+        "text-field": " {name}",
+        "text-font": ["Arial Unicode MS Regula "],
+        "text-ignore-placement": true,
+        "text-keep-upright": false,
+        "text-line-height": 1.3,
+        "text-max-width": 14,
+        "text-offset": [0, -1],
+        "text-size": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          0,
+          5,
+          11,
+          14,
+          16.5,
+          11,
+          19.25,
+          10,
+          22,
+          10
+        ],
+        "visibility": "visible"
+      },
+      "maxzoom": 22,
+      "metadata": {
+        "vallaris:group": "pwa_waterworks"
+      },
+      "minzoom": 10.98,
+      "paint": {
+        "text-color": "rgba(64, 64, 64, 1)",
+        "text-halo-color": "rgba(255, 255, 255, 1)",
+        "text-halo-width": 1
+      },
+      "source": "65d1c4146498e3e59b81f87c",
+      "source-layer": "65d1c4146498e3e59b81f87c",
+      "type": "symbol"
+    }
+  ],
+  "metadata": {
+    "vallaris:groups": {
+      "aerial:basemap": {
+        "collapsed": true,
+        "color": "#3d9de5",
+        "name": "aerial:basemap",
+        "collectionId": ""
+      },
+      "bldg": {
+        "collapsed": true,
+        "color": "rgba(189, 25, 189, 1)",
+        "metadata": {
+          "title": "bldg",
+          "type1": "fill",
+          "type2": "symbol"
+        },
+        "name": "bldg",
+        "collectionId": "65d1c4106498e3e59b81f877"
+      },
+      "firehydrant": {
+        "collapsed": true,
+        "color": "#91f2f0",
+        "metadata": {
+          "added": "true",
+          "description": "หัวดับเพลิง (fire hydrant) เป็นหัวจ่ายน้ำพิเศษที่ช่วยให้นักดับเพลิง สามารถดึงน้ำจากท่อประปาใหญ่ของท้องถิ่นมาใช้ในการดับเพลิงได้",
+          "icon": "Firehydrant150",
+          "title": "firehydrant",
+          "type": "symbol"
+        },
+        "name": "firehydrant",
+        "collectionId": "65d1c4106498e3e59b81f878"
+      },
+      "leakpoint": {
+        "collapsed": true,
+        "color": "rgba(216, 191, 222, 1)",
+        "metadata": {
+          "description": "จุดซ่อมท่อ แสดงตำแหน่งที่ขณะมีการปรับปรุงท่อ (pipe)",
+          "editable": "false",
+          "icon": "Leakpoint",
+          "title": "leakpoint",
+          "type": "symbol"
+        },
+        "name": "leakpoint",
+        "collectionId": "65d1c4116498e3e59b81f879"
+      },
+      "meter": {
+        "collapsed": true,
+        "color": "rgba(45, 195, 28, 1)",
+        "metadata": {
+          "added": "true",
+          "description": "เป็นอุปกรณ์ที่ใช้ในการวัดปริมาตรของน้ำ โดยมาตรวัดน้ำ (METER)จะทำหน้าที่วัดปริมาตรน้�เมื่อมีการ ไหลผ่านและส่งค่าที่ได้ไปที่หน้าปัดหรือหน้าจอแสดงผลซึ่งมีหลักการคำนวณและแปลงอัตราส่วนที่คำนวณได้ เพื่อแสดงผลเป็นค่าที่ทำให้ผู้ใช้สามารถอ่านได้เป็นสากล เช่น ปริมาตรหน่วยลิตร (Litre) หรือ ลูกบาศก์เมตร (Cubic meter) เป็นต้น",
+          "icon": "Meter",
+          "title": "meter",
+          "type": "symbol"
+        },
+        "name": "meter",
+        "collectionId": "65d1c4126498e3e59b81f87a"
+      },
+      "osm:basemap": {
+        "collapsed": true,
+        "color": "rgba(63,116,202,1)",
+        "name": "osm:basemap",
+        "collectionId": ""
+      },
+      "pipe": {
+        "collapsed": true,
+        "color": "#5c037a",
+        "metadata": {
+          "description": "ท่อประปา ระบบประปา หรือระบบท่อน้ำเป็นท่อสำหรับลำเลียงน้ำการประปาเพื่อใช้อุปโภค บริโภค ทั้งในและนอกอาคาร ท่อประปามีหลายชนิดทำจากวัสดุที่แตกต่างกัน อาทิเช่น ท่อประปา PVC, ท่อประปา PPR, ท่อปร�ปาเหล็ก, ท่อประปาไซเลอร์ เป็นต้น",
+          "title": "pipe",
+          "type": "line"
+        },
+        "name": "pipe",
+        "collectionId": "65d1c4136498e3e59b81f87b"
+      },
+      "pwa_waterworks": {
+        "collapsed": true,
+        "color": "rgba(224, 103, 47, 1)",
+        "metadata": {
+          "added": "true",
+          "description": "เป็นที่ตั้งของกิจการประปาตามสาขาต่างๆ",
+          "icon": "PWA",
+          "title": "pwa_waterworks",
+          "type": "symbol"
+        },
+        "name": "pwa_waterworks",
+        "collectionId": "65d1c4146498e3e59b81f87c"
+      },
+      "satellite:basemap": {
+        "collapsed": true,
+        "color": "#2aef4b",
+        "name": "satellite:basemap",
+        "collectionId": ""
+      },
+      "topo:basemap": {
+        "collapsed": true,
+        "color": "#b9d940",
+        "name": "topo:basemap",
+        "collectionId": ""
+      },
+      "valve": {
+        "collapsed": true,
+        "color": "#b4f170",
+        "metadata": {
+          "added": "true",
+          "description": "ประตูน้ำ (Valve) เป็นส่วนประกอบสำคัญของระบบประปาที่ควบคุมการไหลของน้ำ วาล์วน้ำมีหลายประเภท ซึ่งแต่ละประเภทก็จะมีหน้าที่และการใช้งานที่แตกต่างกันไป",
+          "icon": "Valve1",
+          "title": "valve"
+        },
+        "name": "valve",
+        "collectionId": "65d1c4146498e3e59b81f87d"
+      }
+    }
+  },
+  "name": "Vallaris Default",
+  "pitch": 1,
+  "sources": {
+    "osm": {
+      "id": "osm",
+      "type": "vector",
+      "url": "http://192.168.246.235/core/api/tiles/1.0-beta/tiles/public/osm"
+    },
+    "satellite": {
+      "tileSize": 256,
+      "type": "raster",
+      "url": "https://v2k-dev.vallarismaps.com/core/api/tiles/1.0-beta/tiles/public/satellite"
+    },
+    "65d1c4106498e3e59b81f877": {
+      "id": "65d1c4106498e3e59b81f877",
+      "title": "TILE_B5511011_BLDG",
+      "type": "vector",
+      "url": "https://dev-claystone.i-bitz.world/api/2.0/resources/tiles/pwa/b5511011_bldg?token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzZXMiOiI2NjNiNGE4YTZhYzcxYTc4MGM0NmZiYWYiLCJ1aWQiOiI2NjI5MmFhMzJkZWYxYjAxODgzZDE4ZTYiLCJncnQiOiJhY2Nlc3NfdG9rZW4iLCJleHAiOjE3MTUyMjIxOTcsImlhdCI6MTcxNTIxODU5N30.pcvjcd-0mN0Vl_73UbfAJrz_3WU9GFykuraP-aUWrWVbjt8HisknY9iRXbImUffFBu76lDJr-SPejOa5Oza4bYQmGx_pXTewwebxUHkGq1WuUYPspu9uj7bkkoafZJjJDd7syBYWaSOd7OUEl_9gj0M3fTuiyjysE5jFdhASZjtS4dU_Hng8RCdPyb27Mf34ALKOd2eh9SiTqsCLBGQIkbdiLMBVu0sfBTL8TttpsL-yZlsVQOCs013X5237UleYEeKipb_Y_fdigX1zqfkrsvCbjgVv3-YLxtANJq-TY7co-f5LLrnPnidHKJm_PXwagaeI2eC36WyxWeC5i-PFiaTK_5sRA93YmPSEcfOEBK6PV9FsmEnkIgw4hjAhk7cYWHRxOu0Z55ZwssRcBvyAjNaP9dZcKOARk5BZTo0VHuS6IJI_Uyd-erMOBYyFXJZ8BR2T8LZXcgL2dWtWtKhAmHB8NVo9VxFKcwqIpy9-pJMvUwSZo-6PXFWRZalJMqkj19HbapfzaRProhu_pscUdemntvWUAvmhPV4B2Yv4jBocMD47FZm_TOOCLGTbI7o7ZOjSpH8RYtQOdHtwelKYzhgs0mW1rntXMpk0uxKgKPY40uxkQAKjcpB4iOg0OqdsRgkAvfcGUpjHyeOEoaFd7Ay465eWrn82Mp5D4FxX9UM"
+    },
+    "65d1c4106498e3e59b81f878": {
+      "id": "65d1c4106498e3e59b81f878",
+      "title": "TILE_B5511011_FIREHYDRANT",
+      "type": "vector",
+      "url": "https://dev-claystone.i-bitz.world/api/2.0/resources/tiles/pwa/b5511011_firehydrant?token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzZXMiOiI2NjNiNGE4YTZhYzcxYTc4MGM0NmZiYWYiLCJ1aWQiOiI2NjI5MmFhMzJkZWYxYjAxODgzZDE4ZTYiLCJncnQiOiJhY2Nlc3NfdG9rZW4iLCJleHAiOjE3MTUyMjIxOTcsImlhdCI6MTcxNTIxODU5N30.pcvjcd-0mN0Vl_73UbfAJrz_3WU9GFykuraP-aUWrWVbjt8HisknY9iRXbImUffFBu76lDJr-SPejOa5Oza4bYQmGx_pXTewwebxUHkGq1WuUYPspu9uj7bkkoafZJjJDd7syBYWaSOd7OUEl_9gj0M3fTuiyjysE5jFdhASZjtS4dU_Hng8RCdPyb27Mf34ALKOd2eh9SiTqsCLBGQIkbdiLMBVu0sfBTL8TttpsL-yZlsVQOCs013X5237UleYEeKipb_Y_fdigX1zqfkrsvCbjgVv3-YLxtANJq-TY7co-f5LLrnPnidHKJm_PXwagaeI2eC36WyxWeC5i-PFiaTK_5sRA93YmPSEcfOEBK6PV9FsmEnkIgw4hjAhk7cYWHRxOu0Z55ZwssRcBvyAjNaP9dZcKOARk5BZTo0VHuS6IJI_Uyd-erMOBYyFXJZ8BR2T8LZXcgL2dWtWtKhAmHB8NVo9VxFKcwqIpy9-pJMvUwSZo-6PXFWRZalJMqkj19HbapfzaRProhu_pscUdemntvWUAvmhPV4B2Yv4jBocMD47FZm_TOOCLGTbI7o7ZOjSpH8RYtQOdHtwelKYzhgs0mW1rntXMpk0uxKgKPY40uxkQAKjcpB4iOg0OqdsRgkAvfcGUpjHyeOEoaFd7Ay465eWrn82Mp5D4FxX9UM"
+    },
+    "65d1c4116498e3e59b81f879": {
+      "id": "65d1c4116498e3e59b81f879",
+      "title": "TILE_B5511011_LEAKPOINT",
+      "type": "vector",
+      "url": "https://dev-claystone.i-bitz.world/api/2.0/resources/tiles/pwa/b5511011_leakpoint?token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzZXMiOiI2NjNiNGE4YTZhYzcxYTc4MGM0NmZiYWYiLCJ1aWQiOiI2NjI5MmFhMzJkZWYxYjAxODgzZDE4ZTYiLCJncnQiOiJhY2Nlc3NfdG9rZW4iLCJleHAiOjE3MTUyMjIxOTcsImlhdCI6MTcxNTIxODU5N30.pcvjcd-0mN0Vl_73UbfAJrz_3WU9GFykuraP-aUWrWVbjt8HisknY9iRXbImUffFBu76lDJr-SPejOa5Oza4bYQmGx_pXTewwebxUHkGq1WuUYPspu9uj7bkkoafZJjJDd7syBYWaSOd7OUEl_9gj0M3fTuiyjysE5jFdhASZjtS4dU_Hng8RCdPyb27Mf34ALKOd2eh9SiTqsCLBGQIkbdiLMBVu0sfBTL8TttpsL-yZlsVQOCs013X5237UleYEeKipb_Y_fdigX1zqfkrsvCbjgVv3-YLxtANJq-TY7co-f5LLrnPnidHKJm_PXwagaeI2eC36WyxWeC5i-PFiaTK_5sRA93YmPSEcfOEBK6PV9FsmEnkIgw4hjAhk7cYWHRxOu0Z55ZwssRcBvyAjNaP9dZcKOARk5BZTo0VHuS6IJI_Uyd-erMOBYyFXJZ8BR2T8LZXcgL2dWtWtKhAmHB8NVo9VxFKcwqIpy9-pJMvUwSZo-6PXFWRZalJMqkj19HbapfzaRProhu_pscUdemntvWUAvmhPV4B2Yv4jBocMD47FZm_TOOCLGTbI7o7ZOjSpH8RYtQOdHtwelKYzhgs0mW1rntXMpk0uxKgKPY40uxkQAKjcpB4iOg0OqdsRgkAvfcGUpjHyeOEoaFd7Ay465eWrn82Mp5D4FxX9UM"
+    },
+    "65d1c4126498e3e59b81f87a": {
+      "id": "65d1c4126498e3e59b81f87a",
+      "title": "TILE_B5511011_METER",
+      "type": "vector",
+      "url": "https://dev-claystone.i-bitz.world/api/2.0/resources/tiles/pwa/b5511011_meter?token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzZXMiOiI2NjNiNGE4YTZhYzcxYTc4MGM0NmZiYWYiLCJ1aWQiOiI2NjI5MmFhMzJkZWYxYjAxODgzZDE4ZTYiLCJncnQiOiJhY2Nlc3NfdG9rZW4iLCJleHAiOjE3MTUyMjIxOTcsImlhdCI6MTcxNTIxODU5N30.pcvjcd-0mN0Vl_73UbfAJrz_3WU9GFykuraP-aUWrWVbjt8HisknY9iRXbImUffFBu76lDJr-SPejOa5Oza4bYQmGx_pXTewwebxUHkGq1WuUYPspu9uj7bkkoafZJjJDd7syBYWaSOd7OUEl_9gj0M3fTuiyjysE5jFdhASZjtS4dU_Hng8RCdPyb27Mf34ALKOd2eh9SiTqsCLBGQIkbdiLMBVu0sfBTL8TttpsL-yZlsVQOCs013X5237UleYEeKipb_Y_fdigX1zqfkrsvCbjgVv3-YLxtANJq-TY7co-f5LLrnPnidHKJm_PXwagaeI2eC36WyxWeC5i-PFiaTK_5sRA93YmPSEcfOEBK6PV9FsmEnkIgw4hjAhk7cYWHRxOu0Z55ZwssRcBvyAjNaP9dZcKOARk5BZTo0VHuS6IJI_Uyd-erMOBYyFXJZ8BR2T8LZXcgL2dWtWtKhAmHB8NVo9VxFKcwqIpy9-pJMvUwSZo-6PXFWRZalJMqkj19HbapfzaRProhu_pscUdemntvWUAvmhPV4B2Yv4jBocMD47FZm_TOOCLGTbI7o7ZOjSpH8RYtQOdHtwelKYzhgs0mW1rntXMpk0uxKgKPY40uxkQAKjcpB4iOg0OqdsRgkAvfcGUpjHyeOEoaFd7Ay465eWrn82Mp5D4FxX9UM"
+    },
+    "65d1c4136498e3e59b81f87b": {
+      "id": "65d1c4136498e3e59b81f87b",
+      "title": "TILE_B5511011_PIPE",
+      "type": "vector",
+      "url": "https://dev-claystone.i-bitz.world/api/2.0/resources/tiles/pwa/b5511011_pipe?token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzZXMiOiI2NjNiNGE4YTZhYzcxYTc4MGM0NmZiYWYiLCJ1aWQiOiI2NjI5MmFhMzJkZWYxYjAxODgzZDE4ZTYiLCJncnQiOiJhY2Nlc3NfdG9rZW4iLCJleHAiOjE3MTUyMjIxOTcsImlhdCI6MTcxNTIxODU5N30.pcvjcd-0mN0Vl_73UbfAJrz_3WU9GFykuraP-aUWrWVbjt8HisknY9iRXbImUffFBu76lDJr-SPejOa5Oza4bYQmGx_pXTewwebxUHkGq1WuUYPspu9uj7bkkoafZJjJDd7syBYWaSOd7OUEl_9gj0M3fTuiyjysE5jFdhASZjtS4dU_Hng8RCdPyb27Mf34ALKOd2eh9SiTqsCLBGQIkbdiLMBVu0sfBTL8TttpsL-yZlsVQOCs013X5237UleYEeKipb_Y_fdigX1zqfkrsvCbjgVv3-YLxtANJq-TY7co-f5LLrnPnidHKJm_PXwagaeI2eC36WyxWeC5i-PFiaTK_5sRA93YmPSEcfOEBK6PV9FsmEnkIgw4hjAhk7cYWHRxOu0Z55ZwssRcBvyAjNaP9dZcKOARk5BZTo0VHuS6IJI_Uyd-erMOBYyFXJZ8BR2T8LZXcgL2dWtWtKhAmHB8NVo9VxFKcwqIpy9-pJMvUwSZo-6PXFWRZalJMqkj19HbapfzaRProhu_pscUdemntvWUAvmhPV4B2Yv4jBocMD47FZm_TOOCLGTbI7o7ZOjSpH8RYtQOdHtwelKYzhgs0mW1rntXMpk0uxKgKPY40uxkQAKjcpB4iOg0OqdsRgkAvfcGUpjHyeOEoaFd7Ay465eWrn82Mp5D4FxX9UM"
+    },
+    "65d1c4146498e3e59b81f87c": {
+      "id": "65d1c4146498e3e59b81f87c",
+      "title": "TILE_B5511011_PWA_WATERWORKS",
+      "type": "vector",
+      "url": "https://dev-claystone.i-bitz.world/api/2.0/resources/tiles/pwa/b5511011_pwa_waterworks?token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzZXMiOiI2NjNiNGE4YTZhYzcxYTc4MGM0NmZiYWYiLCJ1aWQiOiI2NjI5MmFhMzJkZWYxYjAxODgzZDE4ZTYiLCJncnQiOiJhY2Nlc3NfdG9rZW4iLCJleHAiOjE3MTUyMjIxOTcsImlhdCI6MTcxNTIxODU5N30.pcvjcd-0mN0Vl_73UbfAJrz_3WU9GFykuraP-aUWrWVbjt8HisknY9iRXbImUffFBu76lDJr-SPejOa5Oza4bYQmGx_pXTewwebxUHkGq1WuUYPspu9uj7bkkoafZJjJDd7syBYWaSOd7OUEl_9gj0M3fTuiyjysE5jFdhASZjtS4dU_Hng8RCdPyb27Mf34ALKOd2eh9SiTqsCLBGQIkbdiLMBVu0sfBTL8TttpsL-yZlsVQOCs013X5237UleYEeKipb_Y_fdigX1zqfkrsvCbjgVv3-YLxtANJq-TY7co-f5LLrnPnidHKJm_PXwagaeI2eC36WyxWeC5i-PFiaTK_5sRA93YmPSEcfOEBK6PV9FsmEnkIgw4hjAhk7cYWHRxOu0Z55ZwssRcBvyAjNaP9dZcKOARk5BZTo0VHuS6IJI_Uyd-erMOBYyFXJZ8BR2T8LZXcgL2dWtWtKhAmHB8NVo9VxFKcwqIpy9-pJMvUwSZo-6PXFWRZalJMqkj19HbapfzaRProhu_pscUdemntvWUAvmhPV4B2Yv4jBocMD47FZm_TOOCLGTbI7o7ZOjSpH8RYtQOdHtwelKYzhgs0mW1rntXMpk0uxKgKPY40uxkQAKjcpB4iOg0OqdsRgkAvfcGUpjHyeOEoaFd7Ay465eWrn82Mp5D4FxX9UM"
+    },
+    "65d1c4146498e3e59b81f87d": {
+      "id": "65d1c4146498e3e59b81f87d",
+      "title": "TILE_B5511011_VALVE",
+      "type": "vector",
+      "url": "https://dev-claystone.i-bitz.world/api/2.0/resources/tiles/pwa/b5511011_valve?token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzZXMiOiI2NjNiNGE4YTZhYzcxYTc4MGM0NmZiYWYiLCJ1aWQiOiI2NjI5MmFhMzJkZWYxYjAxODgzZDE4ZTYiLCJncnQiOiJhY2Nlc3NfdG9rZW4iLCJleHAiOjE3MTUyMjIxOTcsImlhdCI6MTcxNTIxODU5N30.pcvjcd-0mN0Vl_73UbfAJrz_3WU9GFykuraP-aUWrWVbjt8HisknY9iRXbImUffFBu76lDJr-SPejOa5Oza4bYQmGx_pXTewwebxUHkGq1WuUYPspu9uj7bkkoafZJjJDd7syBYWaSOd7OUEl_9gj0M3fTuiyjysE5jFdhASZjtS4dU_Hng8RCdPyb27Mf34ALKOd2eh9SiTqsCLBGQIkbdiLMBVu0sfBTL8TttpsL-yZlsVQOCs013X5237UleYEeKipb_Y_fdigX1zqfkrsvCbjgVv3-YLxtANJq-TY7co-f5LLrnPnidHKJm_PXwagaeI2eC36WyxWeC5i-PFiaTK_5sRA93YmPSEcfOEBK6PV9FsmEnkIgw4hjAhk7cYWHRxOu0Z55ZwssRcBvyAjNaP9dZcKOARk5BZTo0VHuS6IJI_Uyd-erMOBYyFXJZ8BR2T8LZXcgL2dWtWtKhAmHB8NVo9VxFKcwqIpy9-pJMvUwSZo-6PXFWRZalJMqkj19HbapfzaRProhu_pscUdemntvWUAvmhPV4B2Yv4jBocMD47FZm_TOOCLGTbI7o7ZOjSpH8RYtQOdHtwelKYzhgs0mW1rntXMpk0uxKgKPY40uxkQAKjcpB4iOg0OqdsRgkAvfcGUpjHyeOEoaFd7Ay465eWrn82Mp5D4FxX9UM"
+    }
+  },
+  "sprite": "http://192.168.246.235/core/api/tiles/1.0-beta/sprite/65792edcd715b5ab12310280/sprites",
+  "version": 8,
+  "zoom": 16
+}
