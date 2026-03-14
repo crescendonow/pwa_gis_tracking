@@ -6,30 +6,30 @@
     <title>เข้าสู่ระบบ — PWA GIS Online Tracking</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🗺️</text></svg>">
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;600;700&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <!-- Responsive style -->
     <link rel="stylesheet" href="/pwa_gis_tracking/static/css/responsive.css">
     <style>
         :root {
-            --bg-primary:    #0A0F1A;
-            --bg-secondary:  #111827;
-            --bg-card:       #1A2332;
-            --border:        rgba(255,255,255,0.06);
-            --text-primary:  #F1F5F9;
-            --text-secondary:#94A3B8;
-            --text-muted:    #64748B;
-            --pwa-blue:      #1B4F72;
-            --pwa-blue-light:#2E86C1;
-            --pwa-gold:      #D4A843;
-            --accent-green:  #10B981;
-            --accent-red:    #EF4444;
+            --bg-primary:    #FAFBFC;
+            --bg-secondary:  #F6F6F6;
+            --bg-card:       #FFFFFF;
+            --border:        rgba(0,0,0,0.12);
+            --text-primary:  #1A1A1A;
+            --text-secondary:#4A4A4A;
+            --text-muted:    #757575;
+            --pwa-blue:      #3F74CA;
+            --pwa-blue-light:#78AFE2;
+            --pwa-gold:      #3EBA96;
+            --accent-green:  #3EBA96;
+            --accent-red:    #F05B50;
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
-            font-family: 'IBM Plex Sans Thai', sans-serif;
+            font-family: 'Noto Sans Thai', 'Poppins', sans-serif;
             background: var(--bg-primary);
             color: var(--text-primary);
             min-height: 100vh;
@@ -38,35 +38,18 @@
             overflow: hidden;
         }
 
-        /* ===== Animated Background ===== */
+        /* ===== Background Layers ===== */
         .bg-layer { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
-        .bg-gradient {
-            background:
-                radial-gradient(ellipse 80% 50% at 20% 80%, rgba(27,79,114,0.25) 0%, transparent 70%),
-                radial-gradient(ellipse 60% 40% at 80% 20%, rgba(46,134,193,0.12) 0%, transparent 70%),
-                radial-gradient(ellipse 40% 30% at 50% 50%, rgba(212,168,67,0.06) 0%, transparent 70%);
+        .bg-auth {
+            background: url('/pwa_gis_tracking/static/images/Background-auth.png') center center / cover no-repeat;
+            opacity: 0.35;
         }
-        .bg-grid {
-            background-image:
-                linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
-            background-size: 60px 60px;
-            animation: gridDrift 30s linear infinite;
+        .bg-gradient-img {
+            background: url('/pwa_gis_tracking/static/images/Background-gradient.png') center bottom / cover no-repeat;
         }
-        @keyframes gridDrift { 0% { background-position:0 0; } 100% { background-position:60px 60px; } }
-
-        /* Water ripples */
-        .ripple {
-            position: absolute; border-radius: 50%;
-            border: 1px solid rgba(46,134,193,0.08);
-            animation: rippleExpand 8s ease-out infinite;
-        }
-        .ripple:nth-child(1) { width:300px; height:300px; left:10%; top:60%; animation-delay:0s; }
-        .ripple:nth-child(2) { width:500px; height:500px; right:-5%; top:20%; animation-delay:2s; }
-        .ripple:nth-child(3) { width:200px; height:200px; left:55%; top:80%; animation-delay:4s; }
-        @keyframes rippleExpand {
-            0%   { transform:scale(0.8); opacity:0.6; }
-            100% { transform:scale(1.8); opacity:0; }
+        .bg-bottom {
+            background: url('/pwa_gis_tracking/static/images/Background-bottom.png') center bottom / 100% auto no-repeat;
+            bottom: 0; top: auto; height: 260px;
         }
 
         /* ===== Layout ===== */
@@ -96,7 +79,7 @@
             background: linear-gradient(135deg, var(--pwa-blue), var(--pwa-blue-light));
             border-radius: 22px;
             margin-bottom: 20px;
-            box-shadow: 0 8px 32px rgba(27,79,114,0.4), 0 0 0 1px rgba(255,255,255,0.05);
+            box-shadow: 0 8px 32px rgba(63,116,202,0.2), 0 0 0 1px rgba(63,116,202,0.08);
             position: relative; overflow: hidden;
         }
         .logo-badge img {
@@ -113,7 +96,7 @@
         @keyframes shimmer { 0%,100% { transform:translateX(-100%); } 50% { transform:translateX(100%); } }
 
         .login-header h1 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
-        .login-header p   { font-size: 13px; color: var(--text-muted); }
+        .login-header p   { font-size: 13px; color: var(--text-secondary); font-weight: 500; }
 
         /* ===== Card ===== */
         .login-card {
@@ -121,14 +104,14 @@
             border: 1px solid var(--border);
             border-radius: 16px;
             padding: 32px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3), 0 0 0 1px rgba(255,255,255,0.03) inset;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.04) inset;
             position: relative; overflow: hidden;
         }
         .login-card::before {
             content: '';
             position: absolute; top: 0; left: 0; right: 0;
             height: 3px;
-            background: linear-gradient(90deg, var(--pwa-blue), var(--pwa-gold), var(--pwa-blue-light));
+            background: linear-gradient(270deg, #3EBA96 -14%, #3E9DAC 22%, #3F8FB6 42%, #3F74CA 67%);
         }
         .card-title {
             font-size: 16px; font-weight: 600;
@@ -140,8 +123,8 @@
         /* ===== Form ===== */
         .field { margin-bottom: 20px; }
         .field label {
-            display: block; font-size: 12px; font-weight: 500;
-            color: var(--text-secondary); margin-bottom: 6px;
+            display: block; font-size: 12px; font-weight: 600;
+            color: var(--text-primary); margin-bottom: 6px;
         }
         .input-wrap { position: relative; }
         .input-wrap .icon-left {
@@ -163,7 +146,7 @@
         .input-wrap input::placeholder { color: var(--text-muted); }
         .input-wrap input:focus {
             border-color: var(--pwa-blue-light);
-            box-shadow: 0 0 0 3px rgba(46,134,193,0.15);
+            box-shadow: 0 0 0 3px rgba(63,116,202,0.1);
         }
         .input-wrap input:focus ~ .icon-left { color: var(--pwa-blue-light); }
 
@@ -185,7 +168,7 @@
             background: rgba(239,68,68,0.1);
             border: 1px solid rgba(239,68,68,0.2);
             border-radius: 10px;
-            font-size: 13px; color: #FCA5A5;
+            font-size: 13px; color: #F05B50;
             margin-bottom: 20px;
             animation: shakeX 0.4s ease-out;
         }
@@ -211,7 +194,7 @@
         }
         .btn-login:hover {
             transform: translateY(-1px);
-            box-shadow: 0 8px 24px rgba(27,79,114,0.4);
+            box-shadow: 0 8px 24px rgba(63,116,202,0.3);
         }
         .btn-login:active { transform: translateY(0); }
         .btn-login:disabled { opacity: 0.7; cursor: wait; }
@@ -248,13 +231,9 @@
 <body>
 
     <!-- Background -->
-    <div class="bg-layer bg-gradient"></div>
-    <div class="bg-layer bg-grid"></div>
-    <div class="bg-layer">
-        <div class="ripple"></div>
-        <div class="ripple"></div>
-        <div class="ripple"></div>
-    </div>
+    <div class="bg-layer bg-gradient-img"></div>
+    <div class="bg-layer bg-auth"></div>
+    <div class="bg-layer bg-bottom"></div>
 
     <!-- Login -->
     <div class="login-wrapper">

@@ -2,28 +2,28 @@
    PWA GIS Online Tracking - Custom Styles
    ========================================== */
 
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;600;700&family=Poppins:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
 :root {
-    --pwa-blue: #1B4F72;
-    --pwa-blue-light: #2E86C1;
-    --pwa-blue-dark: #0D2F4F;
-    --pwa-gold: #D4A843;
-    --pwa-gold-light: #F0D68A;
-    --surface-0: #0A0F1A;
-    --surface-1: #111827;
-    --surface-2: #1C2538;
-    --surface-3: #253249;
-    --surface-4: #2E3D55;
-    --text-primary: #F1F5F9;
-    --text-secondary: #94A3B8;
-    --text-muted: #64748B;
-    --accent-green: #22C55E;
-    --accent-red: #EF4444;
-    --accent-orange: #F97316;
-    --accent-cyan: #06B6D4;
-    --border: rgba(148, 163, 184, 0.1);
-    --glow: rgba(43, 134, 193, 0.15);
+    --pwa-blue: #3F74CA;
+    --pwa-blue-light: #78AFE2;
+    --pwa-blue-dark: #355398;
+    --pwa-gold: #3EBA96;
+    --pwa-gold-light: #AFEBD3;
+    --surface-0: #FAFBFC;
+    --surface-1: #FFFFFF;
+    --surface-2: #F6F6F6;
+    --surface-3: #EBEBEB;
+    --surface-4: #D1D1D1;
+    --text-primary: #1A1A1A;
+    --text-secondary: #4A4A4A;
+    --text-muted: #757575;
+    --accent-green: #3EBA96;
+    --accent-red: #F05B50;
+    --accent-orange: #FF7C0A;
+    --accent-cyan: #3F8FB6;
+    --border: rgba(0, 0, 0, 0.12);
+    --glow: rgba(63, 116, 202, 0.10);
 }
 
 * {
@@ -33,7 +33,7 @@
 }
 
 body {
-    font-family: 'IBM Plex Sans Thai', sans-serif;
+    font-family: 'Noto Sans Thai', 'Poppins', sans-serif;
     background: var(--surface-0);
     color: var(--text-primary);
     min-height: 100vh;
@@ -48,8 +48,8 @@ body::before {
     position: fixed;
     inset: 0;
     background-image: 
-        linear-gradient(rgba(43, 134, 193, 0.03) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(43, 134, 193, 0.03) 1px, transparent 1px);
+        linear-gradient(rgba(63, 116, 202, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(63, 116, 202, 0.03) 1px, transparent 1px);
     background-size: 60px 60px;
     pointer-events: none;
     z-index: 0;
@@ -77,7 +77,7 @@ body::before {
    Top Navigation
    ========================================== */
 .top-nav {
-    background: linear-gradient(135deg, var(--pwa-blue-dark), var(--pwa-blue));
+    background: linear-gradient(270deg, #3EBA96 -14%, #3E9DAC 22%, #3F8FB6 42%, #3F74CA 67%);
     border-bottom: 1px solid var(--border);
     position: sticky;
     top: 0;
@@ -94,15 +94,15 @@ body::before {
 .nav-brand .logo-icon {
     width: 40px;
     height: 40px;
-    background: linear-gradient(135deg, var(--pwa-gold), var(--pwa-gold-light));
+    background: linear-gradient(135deg, #FFFFFF, #EBF3FA);
     border-radius: 10px;
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 20px;
     font-weight: 700;
-    color: var(--pwa-blue-dark);
-    box-shadow: 0 2px 8px rgba(212, 168, 67, 0.3);
+    color: var(--pwa-blue);
+    box-shadow: 0 2px 8px rgba(63, 116, 202, 0.2);
 }
 
 .nav-brand h1 {
@@ -114,14 +114,14 @@ body::before {
 .nav-brand span {
     font-size: 12px;
     color: var(--pwa-gold-light);
-    font-weight: 400;
+    font-weight: 500;
 }
 
 /* Nav links */
 .nav-link {
     padding: 8px 20px;
     border-radius: 8px;
-    font-weight: 500;
+    font-weight: 600;
     font-size: 14px;
     transition: all 0.2s;
     text-decoration: none;
@@ -131,13 +131,13 @@ body::before {
     gap: 6px;
 }
 .nav-link:hover {
-    background: rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.2);
     color: var(--text-primary);
 }
 .nav-link.active {
-    background: rgba(212, 168, 67, 0.15);
-    color: var(--pwa-gold);
-    border: 1px solid rgba(212, 168, 67, 0.25);
+    background: rgba(255, 255, 255, 0.25);
+    color: #FFFFFF;
+    border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
 /* ==========================================
@@ -151,7 +151,7 @@ body::before {
     transition: all 0.25s;
 }
 .card:hover {
-    border-color: rgba(43, 134, 193, 0.2);
+    border-color: rgba(63, 116, 202, 0.15);
     box-shadow: 0 4px 24px var(--glow);
 }
 
@@ -179,17 +179,18 @@ body::before {
    Stat Cards - Summary Numbers
    ========================================== */
 .stat-card {
-    background: linear-gradient(135deg, var(--surface-2), var(--surface-1));
-    border: 1px solid var(--border);
+    background: linear-gradient(270deg, #3EBA96 -14%, #3E9DAC 22%, #3F8FB6 42%, #3F74CA 67%);
+    border: none;
     border-radius: 12px;
     padding: 20px;
     position: relative;
     overflow: hidden;
     transition: all 0.3s;
+    color: #FFFFFF;
 }
 .stat-card:hover {
     transform: translateY(-2px);
-    box-shadow: 0 8px 32px var(--glow);
+    box-shadow: 0 8px 32px rgba(63, 116, 202, 0.3);
 }
 .stat-card::after {
     content: '';
@@ -199,17 +200,13 @@ body::before {
     width: 80px;
     height: 80px;
     border-radius: 0 12px 0 40px;
-    opacity: 0.08;
+    background: rgba(255, 255, 255, 0.1);
 }
-.stat-card.blue::after { background: var(--pwa-blue-light); }
-.stat-card.green::after { background: var(--accent-green); }
-.stat-card.gold::after { background: var(--pwa-gold); }
-.stat-card.cyan::after { background: var(--accent-cyan); }
 
 .stat-card .stat-label {
     font-size: 12px;
-    color: var(--text-muted);
-    font-weight: 500;
+    color: rgba(255, 255, 255, 0.85);
+    font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.05em;
     margin-bottom: 8px;
@@ -220,11 +217,8 @@ body::before {
     font-weight: 700;
     font-family: 'JetBrains Mono', monospace;
     letter-spacing: -0.02em;
+    color: #FFFFFF;
 }
-.stat-card.blue .stat-value { color: var(--pwa-blue-light); }
-.stat-card.green .stat-value { color: var(--accent-green); }
-.stat-card.gold .stat-value { color: var(--pwa-gold); }
-.stat-card.cyan .stat-value { color: var(--accent-cyan); }
 
 /* ==========================================
    Filter Panel
@@ -244,8 +238,8 @@ body::before {
 
 .filter-label {
     font-size: 13px;
-    font-weight: 500;
-    color: var(--text-secondary);
+    font-weight: 600;
+    color: var(--text-primary);
     white-space: nowrap;
 }
 
@@ -256,14 +250,14 @@ select, input[type="date"], input[type="text"] {
     color: var(--text-primary);
     padding: 8px 12px;
     font-size: 13px;
-    font-family: 'IBM Plex Sans Thai', sans-serif;
+    font-family: 'Noto Sans Thai', 'Poppins', sans-serif;
     outline: none;
     transition: border-color 0.2s;
     min-width: 160px;
 }
 select:focus, input:focus {
     border-color: var(--pwa-blue-light);
-    box-shadow: 0 0 0 3px rgba(43, 134, 193, 0.1);
+    box-shadow: 0 0 0 3px rgba(63, 116, 202, 0.1);
 }
 
 /* ==========================================
@@ -276,8 +270,8 @@ select:focus, input:focus {
     padding: 8px 16px;
     border-radius: 8px;
     font-size: 13px;
-    font-weight: 500;
-    font-family: 'IBM Plex Sans Thai', sans-serif;
+    font-weight: 600;
+    font-family: 'Noto Sans Thai', 'Poppins', sans-serif;
     cursor: pointer;
     transition: all 0.2s;
     border: 1px solid transparent;
@@ -287,31 +281,32 @@ select:focus, input:focus {
 .btn-primary {
     background: var(--pwa-blue);
     color: white;
-    border-color: var(--pwa-blue-light);
+    border-color: var(--pwa-blue);
 }
 .btn-primary:hover {
-    background: var(--pwa-blue-light);
-    box-shadow: 0 4px 16px rgba(43, 134, 193, 0.3);
+    background: var(--pwa-blue-dark);
+    box-shadow: 0 4px 16px rgba(63, 116, 202, 0.3);
 }
 
 .btn-gold {
-    background: linear-gradient(135deg, var(--pwa-gold), #B8912E);
-    color: var(--surface-0);
+    background: linear-gradient(135deg, var(--pwa-gold), #15866B);
+    color: #FFFFFF;
     font-weight: 600;
 }
 .btn-gold:hover {
-    box-shadow: 0 4px 16px rgba(212, 168, 67, 0.4);
+    box-shadow: 0 4px 16px rgba(62, 186, 150, 0.4);
     transform: translateY(-1px);
 }
 
 .btn-outline {
-    background: transparent;
-    color: var(--text-secondary);
-    border-color: var(--border);
+    background: var(--surface-1);
+    color: var(--text-primary);
+    border-color: var(--surface-4);
 }
 .btn-outline:hover {
     background: var(--surface-2);
-    color: var(--text-primary);
+    border-color: var(--pwa-blue-light);
+    color: var(--pwa-blue);
 }
 
 .btn-green {
@@ -356,7 +351,7 @@ select:focus, input:focus {
     transition: background 0.15s;
 }
 .data-table tbody tr:hover {
-    background: rgba(43, 134, 193, 0.05);
+    background: rgba(63, 116, 202, 0.04);
 }
 
 .data-table tbody td {
@@ -372,7 +367,7 @@ select:focus, input:focus {
 
 .data-table .num.zero {
     color: var(--text-muted);
-    opacity: 0.5;
+    opacity: 0.7;
 }
 
 .data-table .total-row {
@@ -401,7 +396,7 @@ select:focus, input:focus {
     background: var(--surface-2);
 }
 .zone-item.active {
-    background: rgba(212, 168, 67, 0.12);
+    background: rgba(62, 186, 150, 0.1);
     border-left: 3px solid var(--pwa-gold);
 }
 
@@ -413,8 +408,8 @@ select:focus, input:focus {
 .zone-item .zone-count {
     font-family: 'JetBrains Mono', monospace;
     font-size: 13px;
-    color: var(--pwa-gold);
-    font-weight: 500;
+    color: #2D9B7A;
+    font-weight: 600;
 }
 
 /* ==========================================
@@ -439,10 +434,10 @@ select:focus, input:focus {
     font-weight: 600;
     font-family: 'JetBrains Mono', monospace;
 }
-.badge-blue { background: rgba(43,134,193,0.15); color: var(--pwa-blue-light); }
-.badge-green { background: rgba(34,197,94,0.15); color: var(--accent-green); }
-.badge-gold { background: rgba(212,168,67,0.15); color: var(--pwa-gold); }
-.badge-red { background: rgba(239,68,68,0.15); color: var(--accent-red); }
+.badge-blue { background: rgba(63,116,202,0.12); color: var(--pwa-blue); }
+.badge-green { background: rgba(34,197,94,0.12); color: #1E8A5A; }
+.badge-gold { background: rgba(62,186,150,0.12); color: #2D9B7A; }
+.badge-red { background: rgba(239,68,68,0.12); color: #D43D3D; }
 
 /* ==========================================
    Loading Overlay
@@ -450,7 +445,7 @@ select:focus, input:focus {
 .loading-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(10, 15, 26, 0.85);
+    background: rgba(250, 251, 252, 0.9);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -537,7 +532,7 @@ select:focus, input:focus {
     border: 1px solid var(--border);
     border-radius: 10px;
     padding: 14px 20px;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.12);
     z-index: 200;
     display: flex;
     align-items: center;

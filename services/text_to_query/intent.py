@@ -1,6 +1,5 @@
 """
-LLM integration — call Cloud LLM API and parse structured JSON intent.
-Supports: Gemini Flash (primary), with Ollama as optional fallback.
+LLM integration — call Gemini Flash API and parse structured JSON intent.
 """
 
 import asyncio
@@ -10,12 +9,7 @@ import re
 
 import httpx
 
-from config import (
-    LLM_PROVIDER,
-    GEMINI_API_KEY, GEMINI_MODEL,
-    OLLAMA_BASE_URL, OLLAMA_MODEL, OLLAMA_TIMEOUT,
-    LLM_TIMEOUT,
-)
+from config import GEMINI_API_KEY, GEMINI_MODEL, LLM_TIMEOUT
 from prompts import SYSTEM_PROMPT
 
 log = logging.getLogger("text_to_query")
@@ -70,6 +64,42 @@ async def _call_gemini(messages, timeout=None):
             "temperature": 0,
             "maxOutputTokens": 1024,
             "responseMimeType": "application/json",
+            "responseSchema": {
+                "type": "OBJECT",
+                "properties": {
+                    "text_response": {"type": "STRING"},
+                    "target_db": {"type": "STRING", "enum": ["mongo", "postgis"]},
+                    "response_type": {"type": "STRING", "enum": ["geojson", "numeric", "table"]},
+                    "intent_summary": {"type": "STRING"},
+                    "query": {
+                        "type": "OBJECT",
+                        "properties": {
+                            "mongo": {
+                                "type": "OBJECT",
+                                "properties": {
+                                    "pwa_code": {"type": "STRING", "nullable": True},
+                                    "layer": {
+                                        "type": "STRING",
+                                        "enum": [
+                                            "pipe", "valve", "firehydrant", "meter",
+                                            "bldg", "leakpoint", "pwa_waterworks", "dma_boundary",
+                                        ],
+                                    },
+                                    "pipeline": {"type": "ARRAY", "items": {"type": "OBJECT"}},
+                                    "operation": {"type": "STRING", "enum": ["find", "aggregate", "count"]},
+                                },
+                            },
+                            "postgis": {
+                                "type": "OBJECT",
+                                "properties": {
+                                    "sql": {"type": "STRING"},
+                                },
+                            },
+                        },
+                    },
+                },
+                "required": ["text_response", "target_db", "response_type", "intent_summary", "query"],
+            },
         },
     }
     if system_text:
@@ -107,41 +137,7 @@ async def _call_gemini(messages, timeout=None):
     raise RuntimeError("Gemini rate limited after {} retries".format(max_retries))
 
 
-# ── Ollama (fallback) ─────────────────────────────────────
-
-async def _call_ollama(messages, timeout=None):
-    """Call Ollama native /api/chat endpoint."""
-    if timeout is None:
-        timeout = OLLAMA_TIMEOUT
-    async with httpx.AsyncClient(timeout=timeout) as client:
-        resp = await client.post(
-            "{}/api/chat".format(OLLAMA_BASE_URL),
-            headers={"Content-Type": "application/json"},
-            json={
-                "model": OLLAMA_MODEL,
-                "messages": messages,
-                "stream": False,
-                "keep_alive": "30m",
-                "options": {
-                    "temperature": 0,
-                    "num_predict": 1024,
-                },
-            },
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        return data["message"]["content"]
-
-
 # ── Main entry point ──────────────────────────────────────
-
-async def _call_llm(messages):
-    """Route to configured LLM provider."""
-    if LLM_PROVIDER == "gemini":
-        return await _call_gemini(messages)
-    else:
-        return await _call_ollama(messages)
-
 
 async def generate_query_intent(prompt, pwa_code=""):
     """
@@ -159,8 +155,8 @@ async def generate_query_intent(prompt, pwa_code=""):
     ]
 
     # First attempt
-    raw = await _call_llm(messages)
-    log.info("LLM [%s] raw output (attempt 1): %s", LLM_PROVIDER, raw[:300])
+    raw = await _call_gemini(messages)
+    log.info("LLM [%s] raw output (attempt 1): %s", GEMINI_MODEL, raw[:300])
 
     cleaned = _clean_llm_output(raw)
     try:
@@ -175,8 +171,8 @@ async def generate_query_intent(prompt, pwa_code=""):
         "content": "คำตอบก่อนหน้าไม่ใช่ JSON ที่ถูกต้อง กรุณาตอบเป็น JSON เท่านั้น ตาม format ที่กำหนด",
     })
 
-    raw2 = await _call_llm(messages)
-    log.info("LLM [%s] raw output (attempt 2): %s", LLM_PROVIDER, raw2[:300])
+    raw2 = await _call_gemini(messages)
+    log.info("LLM [%s] raw output (attempt 2): %s", GEMINI_MODEL, raw2[:300])
 
     cleaned2 = _clean_llm_output(raw2)
     try:

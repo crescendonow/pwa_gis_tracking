@@ -46,6 +46,8 @@ LAYER_KEYWORDS = {
     "ที่ตั้งกิจการ": ("pwa_waterworks", "ที่ตั้งกิจการประปา"),
     "สถานีผลิต": ("pwa_waterworks", "สถานีผลิตน้ำ"),
     "สถานีสูบ": ("pwa_waterworks", "สถานีสูบน้ำ"),
+    "โรงกรองน้ำ": ("pwa_waterworks", "โรงกรองน้ำ"),
+    "โรงกรอง": ("pwa_waterworks", "โรงกรองน้ำ"),
     # struct
     "สิ่งก่อสร้าง": ("struct", "สิ่งก่อสร้าง"),
     # pipe_serv
@@ -207,6 +209,30 @@ def _detect_size_gte(text):
     return None
 
 
+def _detect_size_lt(text):
+    """Detect size with '<' comparison (e.g. 'ขนาดต่ำกว่า 100', 'ขนาดน้อยกว่า 100')."""
+    m = re.search(r"(?:ขนาด)?(?:ต่ำกว่า|น้อยกว่า|เล็กกว่า|ไม่เกิน|ไม่ถึง)\s*(\d+)", text)
+    if m:
+        return m.group(1)
+    return None
+
+
+def _detect_fiscal_year(text):
+    """Detect fiscal year (ปีงบประมาณ) — runs Oct(year-1) to Sep(year) in Buddhist era."""
+    m = re.search(r"ปีงบ(?:ประมาณ)?\s*(?:พ\.?ศ\.?\s*)?(\d{4})", text)
+    if m:
+        be_year = int(m.group(1))
+        if be_year > 2400:
+            ce_year = be_year - 543
+        else:
+            ce_year = be_year
+        # Fiscal year X (พ.ศ.) = Oct(X-544) to Sep(X-543) in CE
+        start = "{}-10-01T00:00:00Z".format(ce_year - 1)
+        end = "{}-10-01T00:00:00Z".format(ce_year)
+        return start, end, be_year
+    return None, None, None
+
+
 def _detect_age(text):
     """Detect age-based filter (e.g. 'อายุ 10 ปีขึ้นไป', 'เก่ากว่า 20 ปี')."""
     m = re.search(r"อายุ\s*(?:เกิน|มากกว่า)?\s*(\d+)\s*ปี", text)
@@ -269,20 +295,35 @@ def _detect_unit_km(text):
     return bool(re.search(r"กิโลเมตร|กม\.?|km", text, re.IGNORECASE))
 
 
-def _build_match(pwa_code, pipe_type=None, pipe_func_id=None, size=None, size_gte=None, extra=None):
+def _build_match(pwa_code, pipe_type=None, pipe_func_id=None, size=None,
+                  size_gte=None, size_lt=None, extra=None, layer=None):
     """Build a $match stage with optional filters."""
     match = {}
     if pwa_code:
         match["properties.pwaCode"] = pwa_code
     if pipe_type:
-        match["properties.typeId"] = pipe_type
+        # leakpoint uses pipeTypeId, other layers use typeId
+        type_field = "properties.pipeTypeId" if layer == "leakpoint" else "properties.typeId"
+        match[type_field] = pipe_type
     if pipe_func_id:
         match["properties.functionId"] = pipe_func_id
-    if size and not size_gte:
-        match["properties.sizeId"] = size
-    if size_gte:
-        # Use $expr with $toInt for numeric comparison (sizeId is stored as string)
-        match["$expr"] = {"$gte": [{"$toInt": "$properties.sizeId"}, int(size_gte)]}
+
+    # Size field differs by layer: leakpoint uses pipeSizesId, others use sizeId
+    size_field = "$properties.pipeSizesId" if layer == "leakpoint" else "$properties.sizeId"
+
+    if size and not size_gte and not size_lt:
+        plain_field = size_field.lstrip("$")
+        match[plain_field] = size
+    if size_gte and size_lt:
+        # Both gte and lt: e.g. "ขนาด 100-400"
+        match["$expr"] = {"$and": [
+            {"$gte": [{"$toInt": size_field}, int(size_gte)]},
+            {"$lt": [{"$toInt": size_field}, int(size_lt)]},
+        ]}
+    elif size_gte:
+        match["$expr"] = {"$gte": [{"$toInt": size_field}, int(size_gte)]}
+    elif size_lt:
+        match["$expr"] = {"$lt": [{"$toInt": size_field}, int(size_lt)]}
     if extra:
         match.update(extra)
     return {"$match": match} if match else {"$match": {}}
@@ -305,8 +346,8 @@ def parse_rule(prompt, pwa_code=""):
         r"จำนวน|ทั้งหมด|(?:มี|รวม)?กี่(?:เครื่อง|ตัว|จุด|หลัง|ท่อ|แห่ง|อัน|รายการ)?",
         text
     ))
-    is_group = bool(re.search(r"แยกตาม|แบ่งตาม|จำแนกตาม", text))
-    is_show_position = bool(re.search(r"แสดง|ดู|ตำแหน่ง|ที่ตั้ง|แผนที่|อยู่ที่ไหน|อยู่ตรงไหน", text))
+    is_group = bool(re.search(r"แยกตาม|แบ่งตาม|จำแนกตาม|รายสาขา", text))
+    is_show_position = bool(re.search(r"แสดง|ดู|ตำแหน่ง|ที่ตั้ง|แผนที่|อยู่ที่ไหน|อยู่ตรงไหน|พิกัด|ข้อมูล", text))
     is_total_length = bool(re.search(
         r"(?:ความยาว|ยาว).*(?:รวม|ทั้งหมด|ทั้งประเทศ)|รวม.*(?:กี่เมตร|เมตร|กม\.?|กิโลเมตร)",
         text
@@ -324,10 +365,11 @@ def parse_rule(prompt, pwa_code=""):
 
     size = _detect_size(text)
     size_gte = _detect_size_gte(text)
+    size_lt = _detect_size_lt(text)
     year = _detect_year(text)
     month = _detect_month(text)
     age = _detect_age(text)
-    pipe_type = _detect_pipe_type(text) if layer == "pipe" else None
+    pipe_type = _detect_pipe_type(text) if layer in ("pipe", "leakpoint") else None
     pipe_func_id, pipe_func_label = _detect_pipe_function(text) if layer == "pipe" else (None, None)
     want_km = _detect_unit_km(text)
     meter_stat_id, meter_stat_label = _detect_meter_status(text) if layer == "meter" else (None, None)
@@ -335,6 +377,7 @@ def parse_rule(prompt, pwa_code=""):
     year_range = _detect_year_range(text) if layer == "pipe" else None
     exclude_sleeve = _detect_exclude_sleeve(text) if layer == "pipe" else False
     is_large_pipe = _detect_large_pipe(text) if layer == "pipe" else False
+    fiscal_start, fiscal_end, fiscal_year = _detect_fiscal_year(text)
 
     # Inch → mm conversion (e.g. "4 นิ้ว" → "100")
     if inch_size and not size:
@@ -399,9 +442,9 @@ def parse_rule(prompt, pwa_code=""):
 
         match_stage = _build_match(
             "",  # no single pwa_code — will iterate all branches in zone
-            pipe_type if layer == "pipe" else None,
+            pipe_type if layer in ("pipe", "leakpoint") else None,
             pipe_func_id if layer == "pipe" else None,
-            size, size_gte, extra
+            size, size_gte, size_lt, extra, layer
         )
 
         # Determine operation type
@@ -485,7 +528,7 @@ def parse_rule(prompt, pwa_code=""):
         if exclude_sleeve:
             extra["properties.functionId"] = {"$ne": "6"}
 
-        match_stage = _build_match(effective_pwa, pipe_type, pipe_func_id, size, size_gte, extra)
+        match_stage = _build_match(effective_pwa, pipe_type, pipe_func_id, size, size_gte, size_lt, extra, "pipe")
 
         pipeline = [
             match_stage,
@@ -509,8 +552,12 @@ def parse_rule(prompt, pwa_code=""):
             desc_parts.append("ชนิด {}".format(pipe_type))
         if pipe_func_label:
             desc_parts.append(pipe_func_label)
-        if size_gte:
+        if size_gte and size_lt:
+            desc_parts.append("ขนาด {}-{} มม.".format(size_gte, size_lt))
+        elif size_gte:
             desc_parts.append("ขนาด {} มม. ขึ้นไป".format(size_gte))
+        elif size_lt:
+            desc_parts.append("ขนาดต่ำกว่า {} มม.".format(size_lt))
         elif size:
             desc_parts.append("ขนาด {} มม.".format(size))
         if age:
@@ -548,17 +595,32 @@ def parse_rule(prompt, pwa_code=""):
         group_field = None
         group_label = ""
 
-        if re.search(r"ขนาด", text):
+        # "รายสาขา" implies group by สาขา — detect before other patterns
+        is_by_branch = bool(re.search(r"รายสาขา", text))
+
+        # Extract the group-by target: text after "แยกตาม/แบ่งตาม/จำแนกตาม"
+        group_target_m = re.search(r"(?:แยกตาม|แบ่งตาม|จำแนกตาม)(.*)", text)
+        group_target = group_target_m.group(1) if group_target_m else text
+
+        has_type_in_grp = bool(re.search(r"ชนิด|ประเภท|วัสดุ", group_target))
+        has_size_in_grp = bool(re.search(r"ขนาด", group_target))
+
+        if is_by_branch:
+            group_field = "$properties.pwaCode"
+            group_label = "สาขา"
+        elif has_type_in_grp and has_size_in_grp:
+            # Compound group: "แยกตามชนิดและขนาด"
             if layer == "pipe":
-                group_field = "$properties.sizeId"
-                group_label = "ขนาด (มม.)"
-            elif layer == "meter":
-                group_field = "$properties.meterSizeCode"
-                group_label = "ขนาดมิเตอร์"
-            elif layer in ("valve", "firehydrant"):
-                group_field = "$properties.sizeId"
-                group_label = "ขนาด (มม.)"
-        elif re.search(r"ชนิด|ประเภท|วัสดุ", text):
+                group_field = {"ชนิดท่อ": "$properties.typeId", "ขนาด": "$properties.sizeId"}
+                group_label = "ชนิดท่อ+ขนาด"
+            elif layer == "leakpoint":
+                group_field = {"ชนิดท่อ": "$properties.pipeTypeId", "ขนาดท่อ": "$properties.pipeSizesId"}
+                group_label = "ชนิดท่อ+ขนาดท่อ"
+            else:
+                group_field = {"ชนิด": "$properties.typeId", "ขนาด": "$properties.sizeId"}
+                group_label = "ชนิด+ขนาด"
+        elif has_type_in_grp:
+            # Check ชนิด BEFORE ขนาด to avoid false matches
             if layer == "pipe":
                 group_field = "$properties.typeId"
                 group_label = "ชนิดท่อ"
@@ -568,7 +630,20 @@ def parse_rule(prompt, pwa_code=""):
             elif layer == "leakpoint":
                 group_field = "$properties.pipeTypeId"
                 group_label = "ชนิดท่อ"
-        elif re.search(r"สถานะ", text):
+        elif has_size_in_grp:
+            if layer == "pipe":
+                group_field = "$properties.sizeId"
+                group_label = "ขนาด (มม.)"
+            elif layer == "meter":
+                group_field = "$properties.meterSizeCode"
+                group_label = "ขนาดมิเตอร์"
+            elif layer in ("valve", "firehydrant"):
+                group_field = "$properties.sizeId"
+                group_label = "ขนาด (มม.)"
+            elif layer == "leakpoint":
+                group_field = "$properties.pipeSizesId"
+                group_label = "ขนาดท่อ (มม.)"
+        elif re.search(r"สถานะ", group_target):
             if layer in ("valve", "firehydrant"):
                 group_field = "$properties.statusId"
                 group_label = "สถานะ"
@@ -578,31 +653,44 @@ def parse_rule(prompt, pwa_code=""):
             elif layer == "leakpoint":
                 group_field = "$properties.LeakStatus"
                 group_label = "สถานะ"
-        elif re.search(r"หน้าที่|ฟังก์ชัน", text):
+        elif re.search(r"หน้าที่|ฟังก์ชัน", group_target):
             if layer == "pipe":
                 group_field = "$properties.functionId"
                 group_label = "หน้าที่ท่อ"
             elif layer == "valve":
                 group_field = "$properties.functionId"
                 group_label = "หน้าที่ประตูน้ำ"
-        elif re.search(r"เกรด|ชั้น|class", text):
+        elif re.search(r"เกรด|ชั้น|class", group_target):
             if layer == "pipe":
                 group_field = "$properties.classId"
                 group_label = "ชั้นท่อ"
-        elif re.search(r"สาขา", text):
+        elif re.search(r"สาขา", group_target):
             group_field = "$properties.pwaCode"
             group_label = "สาขา"
-        elif re.search(r"สาเหตุ", text) and layer == "leakpoint":
+        elif re.search(r"สาเหตุ", group_target) and layer == "leakpoint":
             group_field = "$properties.cause"
             group_label = "สาเหตุ"
-        elif re.search(r"ผลิตภัณฑ์|ยี่ห้อ", text) and layer == "pipe":
+        elif re.search(r"ผลิตภัณฑ์|ยี่ห้อ", group_target) and layer == "pipe":
             group_field = "$properties.productId"
             group_label = "ผลิตภัณฑ์"
 
         if group_field:
-            match_stage = _build_match(effective_pwa, pipe_type if layer == "pipe" else None)
+            extra_match = {}
+            if meter_stat_id and layer == "meter":
+                extra_match["properties.custStat"] = meter_stat_id
+            if age and layer == "pipe":
+                cutoff_year = datetime.now().year + 543 - age
+                extra_match["properties.yearInstall"] = {"$lte": cutoff_year}
 
-            # If grouping by sาขา + pipe, also sum length
+            match_stage = _build_match(
+                effective_pwa,
+                pipe_type if layer in ("pipe", "leakpoint") else None,
+                layer=layer,
+                size_gte=size_gte, size_lt=size_lt,
+                extra=extra_match if extra_match else None,
+            )
+
+            # If grouping by สาขา + pipe, also sum length
             extra_accum = {}
             if group_label == "สาขา" and layer == "pipe":
                 extra_accum["ความยาวรวม"] = {"$sum": {"$toDouble": "$properties.length"}}
@@ -610,14 +698,25 @@ def parse_rule(prompt, pwa_code=""):
             group_stage = {"$group": {"_id": group_field, "จำนวน": {"$sum": 1}}}
             group_stage["$group"].update(extra_accum)
 
-            project_stage = {"$project": {"_id": 0, group_label: "$_id", "จำนวน": "$count"}}
-            if extra_accum:
-                project_stage = {"$project": {"_id": 0, group_label: "$_id", "จำนวน": 1, "ความยาวรวม": 1}}
+            # Build $project stage — compound vs simple _id
+            if isinstance(group_field, dict):
+                # Compound group: flatten _id sub-fields into top-level
+                project = {"_id": 0, "จำนวน": "$จำนวน"}
+                for k in group_field:
+                    project[k] = "$_id.{}".format(k)
+                if extra_accum:
+                    project["ความยาวรวม"] = 1
+                project_stage = {"$project": project}
+            else:
+                if extra_accum:
+                    project_stage = {"$project": {"_id": 0, group_label: "$_id", "จำนวน": 1, "ความยาวรวม": 1}}
+                else:
+                    project_stage = {"$project": {"_id": 0, group_label: "$_id", "จำนวน": "$จำนวน"}}
 
             pipeline = [
                 match_stage,
                 group_stage,
-                {"$project": {"_id": 0, group_label: "$_id", "จำนวน": "$จำนวน"}},
+                project_stage,
                 {"$sort": {"จำนวน": -1}},
             ]
             return {
@@ -656,9 +755,9 @@ def parse_rule(prompt, pwa_code=""):
 
         match_stage = _build_match(
             effective_pwa,
-            pipe_type if layer == "pipe" else None,
+            pipe_type if layer in ("pipe", "leakpoint") else None,
             pipe_func_id if layer == "pipe" else None,
-            size, size_gte, extra
+            size, size_gte, size_lt, extra, layer
         )
 
         desc_parts = [layer_label]
@@ -666,8 +765,12 @@ def parse_rule(prompt, pwa_code=""):
             desc_parts.append("ชนิด {}".format(pipe_type))
         if pipe_func_label:
             desc_parts.append(pipe_func_label)
-        if size_gte:
+        if size_gte and size_lt:
+            desc_parts.append("ขนาด {}-{} มม.".format(size_gte, size_lt))
+        elif size_gte:
             desc_parts.append("ขนาด {} มม. ขึ้นไป".format(size_gte))
+        elif size_lt:
+            desc_parts.append("ขนาดต่ำกว่า {} มม.".format(size_lt))
         elif size:
             desc_parts.append("ขนาด {} มม.".format(size))
         if age:
@@ -723,7 +826,7 @@ def parse_rule(prompt, pwa_code=""):
     # ─────────────────────────────────────────────────────
     # COUNT with type + size filter — "ท่อ AC ขนาด 100 กี่ท่อ"
     # ─────────────────────────────────────────────────────
-    if is_count and (size or size_gte or pipe_type) and layer:
+    if is_count and (size or size_gte or size_lt or pipe_type) and layer:
         extra = {}
         if age and layer == "pipe":
             cutoff_year = datetime.now().year + 543 - age
@@ -735,16 +838,20 @@ def parse_rule(prompt, pwa_code=""):
 
         match_stage = _build_match(
             effective_pwa,
-            pipe_type if layer == "pipe" else None,
+            pipe_type if layer in ("pipe", "leakpoint") else None,
             pipe_func_id if layer == "pipe" else None,
-            size, size_gte, extra
+            size, size_gte, size_lt, extra, layer
         )
 
         desc_parts = [layer_label]
         if pipe_type:
             desc_parts.append("ชนิด {}".format(pipe_type))
-        if size_gte:
+        if size_gte and size_lt:
+            desc_parts.append("ขนาด {}-{} มม.".format(size_gte, size_lt))
+        elif size_gte:
             desc_parts.append("ขนาด {} มม. ขึ้นไป".format(size_gte))
+        elif size_lt:
+            desc_parts.append("ขนาดต่ำกว่า {} มม.".format(size_lt))
         elif size:
             desc_parts.append("ขนาด {} มม.".format(size))
 
@@ -776,7 +883,7 @@ def parse_rule(prompt, pwa_code=""):
             cutoff_date = "{}-01-01T00:00:00Z".format(datetime.now().year - age)
             extra["properties.beginCustDate"] = {"$lte": cutoff_date}
 
-        match_stage = _build_match(effective_pwa, extra=extra)
+        match_stage = _build_match(effective_pwa, extra=extra, layer=layer)
 
         return {
             "text_response": "กำลังนับจำนวน{} อายุ {} ปีขึ้นไปค่ะ".format(layer_label, age),
@@ -792,6 +899,32 @@ def parse_rule(prompt, pwa_code=""):
                 }
             },
             "_rule_matched": "count_with_age",
+        }
+
+    # ─────────────────────────────────────────────────────
+    # COUNT with fiscal year — "จุดแตกรั่วปีงบประมาณ 2566"
+    # ─────────────────────────────────────────────────────
+    if is_count and fiscal_start and layer:
+        filt = {}
+        if effective_pwa:
+            filt["properties.pwaCode"] = effective_pwa
+        date_field = "properties.leakDatetime" if layer == "leakpoint" else "properties.recordDate"
+        filt[date_field] = {"$gte": fiscal_start, "$lt": fiscal_end}
+
+        return {
+            "text_response": "กำลังนับจำนวน{} ปีงบประมาณ {} ค่ะ".format(layer_label, fiscal_year),
+            "target_db": "mongo",
+            "response_type": "numeric",
+            "intent_summary": "Count {} in fiscal year {}".format(layer, fiscal_year),
+            "query": {
+                "mongo": {
+                    "pwa_code": effective_pwa or None,
+                    "layer": layer,
+                    "pipeline": [filt],
+                    "operation": "count",
+                }
+            },
+            "_rule_matched": "count_fiscal_year",
         }
 
     # ─────────────────────────────────────────────────────
@@ -875,6 +1008,50 @@ def parse_rule(prompt, pwa_code=""):
         if is_nationwide:
             result["_nationwide"] = True
         return result
+
+    # ─────────────────────────────────────────────────────
+    # FALLBACK: layer + date/fiscal year → count
+    # e.g. "จุดแตกรั่วปี 2567" (no explicit จำนวน/กี่)
+    # ─────────────────────────────────────────────────────
+    if layer and (year or month or fiscal_start):
+        filt = {}
+        if effective_pwa:
+            filt["properties.pwaCode"] = effective_pwa
+        date_field = "properties.leakDatetime" if layer == "leakpoint" else "properties.recordDate"
+
+        if fiscal_start:
+            filt[date_field] = {"$gte": fiscal_start, "$lt": fiscal_end}
+            date_desc = "ปีงบประมาณ {} ".format(fiscal_year)
+        elif year and month:
+            start = "{}-{:02d}-01T00:00:00Z".format(year, month)
+            end = "{}-01-01T00:00:00Z".format(year + 1) if month == 12 else "{}-{:02d}-01T00:00:00Z".format(year, month + 1)
+            filt[date_field] = {"$gte": start, "$lt": end}
+            date_desc = "เดือน {}/{} ".format(month, year + 543)
+        elif year:
+            filt[date_field] = {"$gte": "{}-01-01T00:00:00Z".format(year), "$lt": "{}-01-01T00:00:00Z".format(year + 1)}
+            date_desc = "ปี {} ".format(year + 543)
+        else:
+            cy = datetime.now().year
+            start = "{}-{:02d}-01T00:00:00Z".format(cy, month)
+            end = "{}-01-01T00:00:00Z".format(cy + 1) if month == 12 else "{}-{:02d}-01T00:00:00Z".format(cy, month + 1)
+            filt[date_field] = {"$gte": start, "$lt": end}
+            date_desc = "เดือน {} ".format(month)
+
+        return {
+            "text_response": "กำลังนับจำนวน{} {}ค่ะ".format(layer_label, date_desc),
+            "target_db": "mongo",
+            "response_type": "numeric",
+            "intent_summary": "Count {} in {}".format(layer, date_desc.strip()),
+            "query": {
+                "mongo": {
+                    "pwa_code": effective_pwa or None,
+                    "layer": layer,
+                    "pipeline": [filt],
+                    "operation": "count",
+                }
+            },
+            "_rule_matched": "count_with_date",
+        }
 
     # No pattern matched
     return None

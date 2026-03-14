@@ -1,7 +1,18 @@
 {
   "permissions": {
     "allow": [
-      "Bash(pip install PyPDF2)"
+      "Bash(pip install PyPDF2)",
+      "Bash(python -c \"import py_compile; py_compile.compile\\(''services/text_to_query/rule_parser.py'', doraise=True\\); print\\(''OK''\\)\")",
+      "Bash(python -c \":*)",
+      "WebFetch(domain:gisapp.pwa.co.th)",
+      "Bash(python test_rule_parser.py)",
+      "Bash(python -X utf8 test_new_pkg.py)",
+      "Bash(python -X utf8 test_rule_parser.py)",
+      "Bash(go build ./services/)",
+      "Bash(go vet ./handlers/ ./services/)",
+      "Bash(xargs grep -l \"grid\\\\|table\\\\|datagrid\")",
+      "Bash(wc -l services/*.go handlers/*.go)",
+      "Bash(go build ./...)"
     ]
   }
 }

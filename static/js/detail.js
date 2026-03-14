@@ -168,7 +168,7 @@ function renderBranchSelector() {
         btn.style.cssText = 'background:var(--surface-2);border:1px solid var(--border);color:var(--text-secondary);cursor:pointer;';
     });
     var activeBtn = document.querySelector('.zone-filter-btn.active');
-    if (activeBtn) activeBtn.style.cssText = 'background:rgba(212,168,67,0.15);border:1px solid rgba(212,168,67,0.4);color:var(--pwa-gold);cursor:pointer;';
+    if (activeBtn) activeBtn.style.cssText = 'background:rgba(63,116,202,0.1);border:1px solid rgba(63,116,202,0.3);color:var(--pwa-blue);cursor:pointer;';
 
     // Populate available list
     populateAvailableList(availableOffices);
@@ -209,7 +209,7 @@ function filterAvailableByZone(btn) {
         b.style.cssText = 'background:var(--surface-2);border:1px solid var(--border);color:var(--text-secondary);cursor:pointer;';
         b.classList.remove('active');
     });
-    btn.style.cssText = 'background:rgba(212,168,67,0.15);border:1px solid rgba(212,168,67,0.4);color:var(--pwa-gold);cursor:pointer;';
+    btn.style.cssText = 'background:rgba(63,116,202,0.1);border:1px solid rgba(63,116,202,0.3);color:var(--pwa-blue);cursor:pointer;';
     btn.classList.add('active');
     var zone = btn.getAttribute('data-zone');
     var items = document.querySelectorAll('#branchAvailable .dual-list-item');
@@ -317,6 +317,19 @@ async function executeQuery() {
     } else {
         await loadMultiBranchSummary();
     }
+}
+
+function openAdvancedQuery() {
+    if (selectedBranches.length === 0) { showToast('กรุณาเลือกสาขาก่อน', 'error'); return; }
+    if (selectedBranches.length > 1) { showToast('การค้นหาขั้นสูงรองรับ 1 สาขา', 'error'); return; }
+    if (selectedLayers.length === 0) { showToast('กรุณาเลือกชั้นข้อมูลอย่างน้อย 1 ชั้น', 'error'); return; }
+    AdvancedQuery.open({
+        pwaCode: selectedBranches[0],
+        collection: selectedLayers[0],
+        availableLayers: selectedLayers,
+        startDate: document.getElementById('detailStartDate').value,
+        endDate: document.getElementById('detailEndDate').value
+    });
 }
 
 async function loadSingleBranchDetail(pwaCode) {

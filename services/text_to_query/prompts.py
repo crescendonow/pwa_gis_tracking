@@ -59,7 +59,7 @@ LAYERS + FIELDS:
    DATASOURCE: "GIS" or "Smart 1662"
    pwaCode, recordDate
 
-7. pwa_waterworks (ที่ตั้งกิจการประปา):
+7. pwa_waterworks (ที่ตั้งกิจการประปา/สถานีผลิต/โรงกรองน้ำ):
    pwaStationId: 120=สาขา, 211=สถานีผลิตและจ่าย, 221=สถานีผลิต, 231=สถานีจ่าย, 241=สถานีสูบน้ำดิบ, 251=Booster
    name, pwaAddress, waterResource, pwaCode
 
@@ -74,20 +74,35 @@ TABLE pwa_office.pwa_office234:
   pwa_code, name (ชื่อสาขา), zone (เขต), wkb_geometry
 
 ════════════════════════════════════════════
-RULES
+⚠️ CRITICAL RULES (ห้ามละเมิดเด็ดขาด)
+════════════════════════════════════════════
+
+C1. layer ต้องเป็นค่าใดค่าหนึ่งเท่านั้น: pipe, valve, firehydrant, meter, bldg, leakpoint, pwa_waterworks, dma_boundary
+    ❌ ห้ามสร้างชื่อ layer อื่น เช่น "b5500000_pipe", "pipe_data", "pipes", "water_pipe"
+    ❌ ห้ามใส่ prefix เช่น "b5531012_" หน้า layer name
+C2. pwa_code ต้องเป็น null เสมอ — ระบบจะ resolve ชื่อสาขาเป็นรหัสให้อัตโนมัติ
+    ❌ ห้ามเดา/สร้าง pwa_code เช่น "5500000", "5531012"
+C3. MongoDB field ต้อง prefix "properties." เสมอ
+    ✅ "properties.typeId", "properties.sizeId"
+    ❌ "typeId", "sizeId" (ไม่มี prefix = ข้อมูลจะหาไม่เจอ)
+C4. leakpoint layer ใช้ field ต่างจาก pipe:
+    - leakpoint ใช้ "properties.pipeTypeId" (ไม่ใช่ typeId)
+    - leakpoint ใช้ "properties.pipeSizesId" (ไม่ใช่ sizeId)
+C5. sizeId / pipeSizesId เก็บเป็น string — เปรียบเทียบตัวเลขต้องใช้ $toInt:
+    {"$expr": {"$gte": [{"$toInt": "$properties.sizeId"}, 100]}}
+
+════════════════════════════════════════════
+RULES (ทั่วไป)
 ════════════════════════════════════════════
 
 1. READ ONLY: ห้าม INSERT/UPDATE/DELETE/DROP/ALTER/TRUNCATE/CREATE
 2. MongoDB: ใช้เฉพาะ $match, $group, $project, $sort, $limit, $count, $unwind, $geoNear
-3. MongoDB field ต้อง prefix "properties." เช่น "properties.sizeId"
-3b. sizeId เก็บเป็น string — เปรียบเทียบตัวเลขต้องใช้ $expr: {"$expr": {"$gte": [{"$toInt": "$properties.sizeId"}, 100]}}
-4. LIMIT ผลลัพธ์ไม่เกิน 1000 สำหรับ find
-5. วันที่ใช้ ISODate: { "$gte": "2020-01-01T00:00:00Z" }
-6. pwa_code: ใส่ null เสมอ (ระบบ resolve ชื่อสาขาเป็นรหัสให้)
-7. PostGIS: ใส่ ST_AsGeoJSON(wkb_geometry) AS geojson เมื่อต้องการตำแหน่ง
-8. จำนวน/รวม/เฉลี่ย → response_type = "numeric"
-9. รายชื่อ/รายการ → response_type = "table"
-10. แสดงตำแหน่ง/แผนที่ → response_type = "geojson"
+3. LIMIT ผลลัพธ์ไม่เกิน 1000 สำหรับ find
+4. วันที่ใช้ ISODate: { "$gte": "2020-01-01T00:00:00Z" }
+5. PostGIS: ใส่ ST_AsGeoJSON(wkb_geometry) AS geojson เมื่อต้องการตำแหน่ง
+6. จำนวน/รวม/เฉลี่ย → response_type = "numeric"
+7. รายชื่อ/รายการ → response_type = "table"
+8. แสดงตำแหน่ง/แผนที่ → response_type = "geojson"
 
 ════════════════════════════════════════════
 OUTPUT FORMAT (ตอบเป็น JSON เท่านั้น)

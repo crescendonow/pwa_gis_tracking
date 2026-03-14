@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"regexp"
 	"sort"
+	"strings"
 	"time"
 
 	"pwa_gis_tracking/config"
@@ -13,6 +15,36 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
+
+// parseNumericFilter parses operator+value strings like ">=2568", "<=100", ">50", "<10".
+// Returns the MongoDB operator, the numeric value, and whether parsing succeeded.
+func parseNumericFilter(value string) (string, int64, bool) {
+	value = strings.TrimSpace(value)
+	var op string
+	var numStr string
+
+	if strings.HasPrefix(value, ">=") {
+		op = "$gte"
+		numStr = strings.TrimSpace(value[2:])
+	} else if strings.HasPrefix(value, "<=") {
+		op = "$lte"
+		numStr = strings.TrimSpace(value[2:])
+	} else if strings.HasPrefix(value, ">") {
+		op = "$gt"
+		numStr = strings.TrimSpace(value[1:])
+	} else if strings.HasPrefix(value, "<") {
+		op = "$lt"
+		numStr = strings.TrimSpace(value[1:])
+	} else {
+		numStr = value
+	}
+
+	var numVal int64
+	if _, err := fmt.Sscanf(numStr, "%d", &numVal); err != nil {
+		return "", 0, false
+	}
+	return op, numVal, true
+}
 
 // PaginatedResult holds the response for paginated feature queries.
 type PaginatedResult struct {
@@ -37,6 +69,7 @@ func ListFeaturesPaginated(
 	page, pageSize int,
 	raw bool,
 	filters map[string]string,
+	sortBy string, sortOrder int,
 ) (*PaginatedResult, error) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -67,40 +100,47 @@ func ListFeaturesPaginated(
 	}
 
 	// Case-insensitive search across all mapped fields
+	// Supports multi-term search: "hdpe 100" → each term must match at least one field
 	mapping := FieldMapping[collection]
 	if search != "" {
-		searchRegex := primitive.Regex{Pattern: search, Options: "i"}
-		var orConds []bson.M
+		searchTerms := strings.Fields(search)
+		var termConds []bson.M
 
-		if len(mapping) > 0 {
-			for mongoKey, pgKey := range mapping {
-				if pgKey == "password" {
-					continue
+		for _, term := range searchTerms {
+			termRegex := primitive.Regex{Pattern: term, Options: "i"}
+			var orConds []bson.M
+
+			if len(mapping) > 0 {
+				for mongoKey, pgKey := range mapping {
+					if pgKey == "password" {
+						continue
+					}
+					orConds = append(orConds, bson.M{
+						"properties." + mongoKey: termRegex,
+					})
 				}
-				orConds = append(orConds, bson.M{
-					"properties." + mongoKey: searchRegex,
-				})
+			} else {
+				for _, f := range []string{"_id", "typeId", "sizeId", "pwaCode", "remark"} {
+					orConds = append(orConds, bson.M{
+						"properties." + f: termRegex,
+					})
+				}
 			}
-		} else {
-			// Fallback: search common property fields
-			for _, f := range []string{"_id", "typeId", "sizeId", "pwaCode", "remark"} {
-				orConds = append(orConds, bson.M{
-					"properties." + f: searchRegex,
-				})
+
+			if len(orConds) > 0 {
+				termConds = append(termConds, bson.M{"$or": orConds})
 			}
 		}
 
-		if len(orConds) > 0 {
-			// If we already have a date filter, combine with $and
+		if len(termConds) > 0 {
 			if len(filter) > 0 {
-				filter = bson.M{
-					"$and": []bson.M{
-						filter,
-						{"$or": orConds},
-					},
-				}
+				existing := []bson.M{filter}
+				existing = append(existing, termConds...)
+				filter = bson.M{"$and": existing}
+			} else if len(termConds) == 1 {
+				filter = termConds[0]
 			} else {
-				filter["$or"] = orConds
+				filter = bson.M{"$and": termConds}
 			}
 		}
 	}
@@ -118,6 +158,15 @@ func ListFeaturesPaginated(
 		numericIDFields := map[string]bool{
 			"PIPE_ID": true, "VALVE_ID": true, "FIRE_ID": true,
 			"LEAK_ID": true, "STRUCT_ID": true, "BLDG_ID": true,
+		}
+
+		// Integer-cast columns: support comparison operators (>=, <=, >, <)
+		intCastFields := map[string]bool{
+			"yearInstall":       true,
+			"roundOpen":         true,
+			"pressure":          true,
+			"averageWaterUsage": true,
+			"presentWaterUsage": true,
 		}
 
 		for field, value := range filters {
@@ -142,9 +191,43 @@ func ListFeaturesPaginated(
 				} else {
 					andConds = append(andConds, bson.M{propField: value})
 				}
+			} else if intCastFields[field] {
+				// Integer-cast columns: support comparison operators and dual-type match
+				op, numVal, ok := parseNumericFilter(value)
+				if ok {
+					if op != "" {
+						// Comparison operator: $gte, $lte, $gt, $lt
+						andConds = append(andConds, bson.M{
+							propField: bson.M{op: numVal},
+						})
+					} else {
+						// No operator: dual-type match (string AND int)
+						andConds = append(andConds, bson.M{
+							"$or": []bson.M{
+								{propField: fmt.Sprintf("%d", numVal)},
+								{propField: numVal},
+								{propField: int32(numVal)},
+							},
+						})
+					}
+				} else {
+					// Not a valid number, fall back to exact string match
+					andConds = append(andConds, bson.M{propField: value})
+				}
 			} else {
-				// Exact match for other fields
-				andConds = append(andConds, bson.M{propField: value})
+				// Try dual-type match (string + int) for values that look numeric
+				var numVal int64
+				if _, err := fmt.Sscanf(value, "%d", &numVal); err == nil && fmt.Sprintf("%d", numVal) == value {
+					andConds = append(andConds, bson.M{
+						"$or": []bson.M{
+							{propField: value},
+							{propField: numVal},
+							{propField: int32(numVal)},
+						},
+					})
+				} else {
+					andConds = append(andConds, bson.M{propField: value})
+				}
 			}
 		}
 
@@ -176,11 +259,19 @@ func ListFeaturesPaginated(
 	// Paginated query — properties only (no geometry)
 	// ────────────────────────────────────────────
 	skip := int64((page - 1) * pageSize)
+	// Build sort — use sortBy if provided, default to recordDate desc
+	sortKey := "properties.recordDate"
+	sortDir := -1 // descending (newest first)
+	if sortBy != "" {
+		sortKey = "properties." + sortBy
+		sortDir = sortOrder
+	}
+
 	opts := options.Find().
 		SetSkip(skip).
 		SetLimit(int64(pageSize)).
 		SetSort(bson.D{
-			{Key: "properties.recordDate", Value: -1}, // newest first
+			{Key: sortKey, Value: sortDir},
 		}).
 		SetProjection(bson.M{
 			"properties": 1,
@@ -362,4 +453,231 @@ func buildColumnInfo(collection string) []ColumnInfo {
 	}
 
 	return columns
+}
+
+// SuggestFeatureValues returns autocomplete suggestions for a search query.
+// It searches across all mapped fields and returns distinct matching values.
+func SuggestFeatureValues(pwaCode, collection, query string, limit int) ([]map[string]string, error) {
+	if query == "" || len(query) < 2 {
+		return nil, nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	collectionID, err := FindCollectionID(pwaCode, collection)
+	if err != nil {
+		return nil, fmt.Errorf("collection not found: %w", err)
+	}
+
+	coll := config.GetMongoCollection(fmt.Sprintf("features_%s", collectionID))
+	mapping := FieldMapping[collection]
+	if len(mapping) == 0 {
+		return nil, nil
+	}
+
+	// Build $or regex filter across all mapped fields
+	escapedQuery := regexp.QuoteMeta(query)
+	searchRegex := primitive.Regex{Pattern: escapedQuery, Options: "i"}
+	var orConds []bson.M
+	var searchFields []string
+
+	for mongoKey, pgKey := range mapping {
+		if pgKey == "password" {
+			continue
+		}
+		orConds = append(orConds, bson.M{
+			"properties." + mongoKey: searchRegex,
+		})
+		searchFields = append(searchFields, mongoKey)
+	}
+
+	if len(orConds) == 0 {
+		return nil, nil
+	}
+
+	// Query limited docs
+	findOpts := options.Find().
+		SetLimit(60).
+		SetProjection(bson.M{"properties": 1, "_id": 0})
+
+	cursor, err := coll.Find(ctx, bson.M{"$or": orConds}, findOpts)
+	if err != nil {
+		return nil, fmt.Errorf("suggest query error: %w", err)
+	}
+	defer cursor.Close(ctx)
+
+	// Extract matching values from results
+	type suggestion struct {
+		Field string
+		Value string
+	}
+	seen := map[string]bool{}
+	var suggestions []suggestion
+
+	lowerQuery := strings.ToLower(query)
+
+	for cursor.Next(ctx) {
+		var doc bson.M
+		if err := cursor.Decode(&doc); err != nil {
+			continue
+		}
+		props, ok := doc["properties"].(bson.M)
+		if !ok {
+			continue
+		}
+
+		for _, mongoKey := range searchFields {
+			val, exists := props[mongoKey]
+			if !exists || val == nil {
+				continue
+			}
+			strVal := fmt.Sprintf("%v", val)
+			if strVal == "" {
+				continue
+			}
+			if !strings.Contains(strings.ToLower(strVal), lowerQuery) {
+				continue
+			}
+			key := mongoKey + ":" + strVal
+			if seen[key] {
+				continue
+			}
+			seen[key] = true
+			suggestions = append(suggestions, suggestion{Field: mongoKey, Value: strVal})
+			if len(suggestions) >= limit {
+				break
+			}
+		}
+		if len(suggestions) >= limit {
+			break
+		}
+	}
+
+	// Convert to response format
+	result := make([]map[string]string, len(suggestions))
+	for i, s := range suggestions {
+		result[i] = map[string]string{
+			"field": s.Field,
+			"value": s.Value,
+		}
+	}
+	return result, nil
+}
+
+// FacetField defines which fields to aggregate for faceted filtering per collection.
+var FacetFields = map[string][]string{
+	"pipe":           {"typeId", "sizeId", "classId", "functionId", "gradeId", "layingId", "yearInstall"},
+	"valve":          {"typeId", "sizeId", "statusId", "yearInstall"},
+	"firehydrant":    {"sizeId", "statusId"},
+	"meter":          {"custStat", "meterSizeCode", "meterSizeName"},
+	"bldg":           {"buildingTypeId", "useStatusId", "useTypeId"},
+	"leakpoint":      {"typeId", "pipeTypeId", "pipeSizeId", "cause"},
+	"pwa_waterworks": {"depShortName"},
+}
+
+// FacetResult holds one facet: field name + value/count pairs.
+type FacetResult struct {
+	Field  string       `json:"field"`
+	Values []FacetValue `json:"values"`
+}
+
+// FacetValue is a single value with its document count.
+type FacetValue struct {
+	Value string `json:"value"`
+	Count int    `json:"count"`
+}
+
+// GetFacetValues returns distinct values + counts for key columns, used for faceted filtering.
+func GetFacetValues(pwaCode, collection string) ([]FacetResult, error) {
+	fields, ok := FacetFields[collection]
+	if !ok || len(fields) == 0 {
+		return nil, nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	collectionID, err := FindCollectionID(pwaCode, collection)
+	if err != nil {
+		return nil, fmt.Errorf("collection not found: %w", err)
+	}
+
+	coll := config.GetMongoCollection(fmt.Sprintf("features_%s", collectionID))
+
+	// Build a single aggregation with $facet to get all fields in one query
+	facetStage := bson.M{}
+	for _, f := range fields {
+		propField := "properties." + f
+		facetStage[f] = bson.A{
+			bson.M{"$group": bson.M{
+				"_id":   "$" + propField,
+				"count": bson.M{"$sum": 1},
+			}},
+			bson.M{"$match": bson.M{"_id": bson.M{"$ne": nil}}},
+			bson.M{"$sort": bson.M{"count": -1}},
+			bson.M{"$limit": 30},
+		}
+	}
+
+	pipeline := bson.A{
+		bson.M{"$facet": facetStage},
+	}
+
+	cursor, err := coll.Aggregate(ctx, pipeline)
+	if err != nil {
+		return nil, fmt.Errorf("facet aggregation error: %w", err)
+	}
+	defer cursor.Close(ctx)
+
+	// Parse the single-document result
+	var results []FacetResult
+	if cursor.Next(ctx) {
+		var doc bson.M
+		if err := cursor.Decode(&doc); err != nil {
+			return nil, fmt.Errorf("facet decode error: %w", err)
+		}
+
+		for _, f := range fields {
+			rawBuckets, exists := doc[f]
+			if !exists {
+				continue
+			}
+			buckets, ok := rawBuckets.(bson.A)
+			if !ok {
+				continue
+			}
+
+			var values []FacetValue
+			for _, b := range buckets {
+				bucket, ok := b.(bson.M)
+				if !ok {
+					continue
+				}
+				idVal := bucket["_id"]
+				if idVal == nil {
+					continue
+				}
+				strVal := fmt.Sprintf("%v", idVal)
+				if strVal == "" {
+					continue
+				}
+				cnt := 0
+				switch c := bucket["count"].(type) {
+				case int32:
+					cnt = int(c)
+				case int64:
+					cnt = int(c)
+				case float64:
+					cnt = int(c)
+				}
+				values = append(values, FacetValue{Value: strVal, Count: cnt})
+			}
+			if len(values) > 0 {
+				results = append(results, FacetResult{Field: f, Values: values})
+			}
+		}
+	}
+
+	return results, nil
 }

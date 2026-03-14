@@ -16,7 +16,7 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from starlette.responses import JSONResponse
 
-from config import PORT, RATE_LIMIT, LLM_PROVIDER, GEMINI_MODEL, OLLAMA_MODEL
+from config import PORT, RATE_LIMIT, GEMINI_MODEL
 from cache import get_cached, set_cached
 from rule_parser import parse_rule, parse_followup
 from intent import generate_query_intent
@@ -87,6 +87,101 @@ def _get_context(pwa_code):
     return None
 
 
+# ── Post-validation ──────────────────────────────────
+_VALID_LAYERS = {"pipe", "valve", "firehydrant", "meter", "bldg", "leakpoint", "pwa_waterworks", "dma_boundary"}
+
+
+def _sanitize_intent(intent):
+    """Fix common LLM hallucinations before execution."""
+    query = intent.get("query", {})
+    mongo_q = query.get("mongo", {})
+
+    if not mongo_q:
+        return intent
+
+    # 1. Force pwa_code to null (LLM sometimes invents codes)
+    if mongo_q.get("pwa_code"):
+        log.warning("Sanitize: removing hallucinated pwa_code=%s", mongo_q["pwa_code"])
+        mongo_q["pwa_code"] = None
+
+    # 2. Validate and fix layer name
+    layer = mongo_q.get("layer", "")
+    if layer and layer not in _VALID_LAYERS:
+        # Try stripping prefix like "b5500000_pipe" → "pipe"
+        stripped = re.sub(r"^b\d+_", "", layer)
+        if stripped in _VALID_LAYERS:
+            log.warning("Sanitize: fixed layer %s → %s", layer, stripped)
+            mongo_q["layer"] = stripped
+        else:
+            # Try fuzzy matching
+            for valid in _VALID_LAYERS:
+                if valid in layer.lower():
+                    log.warning("Sanitize: fixed layer %s → %s", layer, valid)
+                    mongo_q["layer"] = valid
+                    break
+            else:
+                log.error("Sanitize: invalid layer '%s', cannot fix", layer)
+
+    # 3. Ensure pipeline fields have "properties." prefix
+    pipeline = mongo_q.get("pipeline", [])
+    if pipeline:
+        fixed = _fix_pipeline_fields(pipeline)
+        mongo_q["pipeline"] = fixed
+
+    query["mongo"] = mongo_q
+    intent["query"] = query
+    return intent
+
+
+def _fix_pipeline_fields(pipeline):
+    """Recursively add 'properties.' prefix to known field names missing it."""
+    import json as _json
+
+    _KNOWN_FIELDS = {
+        "typeId", "sizeId", "functionId", "classId", "gradeId", "layingId",
+        "productId", "length", "depth", "yearInstall", "pwaCode", "recordDate",
+        "statusId", "pressure", "custCode", "custFullName", "meterNo",
+        "meterSizeCode", "meterSizeName", "beginCustDate", "custStat",
+        "meterRouteCode", "addressNo", "useStatusId", "buildingTypeId",
+        "useTypeId", "building", "floor", "villageNo", "village", "soi",
+        "road", "subDistrict", "district", "province", "zipcode",
+        "leakNo", "leakDatetime", "cause", "repairBy", "repairCost",
+        "repairDatetime", "pipeTypeId", "pipeSizesId", "LeakStatus",
+        "DATASOURCE", "pwaStationId", "name", "pwaAddress", "waterResource",
+        "dmaNo", "dmaName", "mmNo",
+    }
+
+    raw = _json.dumps(pipeline, ensure_ascii=False)
+    changed = False
+    for field in _KNOWN_FIELDS:
+        # Match field references like "typeId" that are NOT already prefixed with "properties."
+        old_pat = '"' + field + '"'
+        new_pat = '"properties.' + field + '"'
+        prefixed_pat = '"properties.' + field + '"'
+        dollar_pat = '"$' + field + '"'
+        dollar_new = '"$properties.' + field + '"'
+        dollar_prefixed = '"$properties.' + field + '"'
+
+        # Fix key references (in $match etc.)
+        if old_pat in raw and prefixed_pat not in raw.replace(dollar_prefixed, ""):
+            # Only fix if it's used as a key (not already prefixed)
+            pass  # Complex — skip key-level fix, focus on $ references
+
+        # Fix $ references like "$typeId" → "$properties.typeId"
+        if dollar_pat in raw and dollar_prefixed not in raw:
+            raw = raw.replace(dollar_pat, dollar_new)
+            changed = True
+
+    if changed:
+        try:
+            pipeline = _json.loads(raw)
+            log.warning("Sanitize: fixed missing properties. prefix in pipeline fields")
+        except Exception:
+            pass
+
+    return pipeline
+
+
 # ── Models ───────────────────────────────────────────
 class QueryRequest(BaseModel):
     prompt: str = Field(..., max_length=500)
@@ -101,8 +196,8 @@ async def health():
     from config import pg_engine, mongo_db
     return {
         "status": "Text-to-Query service is running",
-        "llm_provider": LLM_PROVIDER,
-        "model": GEMINI_MODEL if LLM_PROVIDER == "gemini" else OLLAMA_MODEL,
+        "llm_provider": "gemini",
+        "model": GEMINI_MODEL,
         "postgis_connected": pg_engine is not None,
         "mongodb_connected": mongo_db is not None,
         "branches_loaded": len(_code_to_name),
@@ -187,6 +282,9 @@ async def text_to_query(req: QueryRequest, request: Request):
             400,
             detail="ไม่สามารถเข้าใจคำถามได้ค่ะ กรุณาลองถามใหม่ เช่น 'จำนวนหัวดับเพลิงทั้งหมด'",
         )
+
+    # Post-validation: fix common LLM hallucinations
+    intent = _sanitize_intent(intent)
 
     target_db = intent.get("target_db", "mongo")
     response_type = intent.get("response_type", "table")
@@ -375,7 +473,7 @@ async def text_to_query(req: QueryRequest, request: Request):
         pwa_code=pwa_code,
         execution_time_ms=elapsed_ms,
         cached=False,
-        model="rule-based" if used_rule else (GEMINI_MODEL if LLM_PROVIDER == "gemini" else OLLAMA_MODEL),
+        model="rule-based" if used_rule else GEMINI_MODEL,
     )
 
     # 6. Cache store

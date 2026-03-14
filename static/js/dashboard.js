@@ -162,7 +162,7 @@ function initZoneMap() {
 
         var marker = L.marker([z.lat, z.lng], { icon: icon, zIndexOffset: 1000 }).addTo(zoneMap);
         marker.bindPopup(
-            '<div style="text-align:center;min-width:160px;font-family:\'IBM Plex Sans Thai\',sans-serif;">' +
+            '<div style="text-align:center;min-width:160px;font-family:\'Noto Sans Thai\',sans-serif;">' +
             '<div style="font-size:15px;font-weight:700;margin-bottom:4px;">เขต ' + zoneId + '</div>' +
             '<div style="color:#555;font-size:12px;">' + z.region + '</div>' +
             '<div style="color:#888;font-size:11px;margin-bottom:6px;">' + z.name + '</div>' +
@@ -230,7 +230,7 @@ async function loadBranchMarkers() {
 
             // Default popup (click)
             m.bindPopup(
-                '<div style="font-family:\'IBM Plex Sans Thai\',sans-serif;min-width:140px;">' +
+                '<div style="font-family:\'Noto Sans Thai\',sans-serif;min-width:140px;">' +
                 '<div style="font-weight:600;font-size:13px;">' + office.name + '</div>' +
                 '<div style="color:#666;font-size:11px;">รหัส: ' + office.pwa_code + '</div>' +
                 '<div style="color:#888;font-size:11px;">เขต: ' + office.zone + '</div>' +
@@ -274,7 +274,7 @@ async function updateBranchTooltips() {
         // Rebind hover tooltip with data
         entry.marker.unbindTooltip();
         entry.marker.bindTooltip(
-            '<div style="font-family:\'IBM Plex Sans Thai\',sans-serif;min-width:180px;line-height:1.5;">' +
+            '<div style="font-family:\'Noto Sans Thai\',sans-serif;min-width:180px;line-height:1.5;">' +
             '<div style="font-weight:700;font-size:13px;color:' + color + ';">' +
             '<i class="fa-solid fa-house-flood-water" style="margin-right:4px;"></i>' + office.name + '</div>' +
             '<div style="color:#555;font-size:11px;margin-bottom:4px;">รหัส ' + b.pwa_code + ' | เขต ' + b.zone + '</div>' +
@@ -292,7 +292,7 @@ async function updateBranchTooltips() {
         // Also enrich click popup
         entry.marker.unbindPopup();
         entry.marker.bindPopup(
-            '<div style="font-family:\'IBM Plex Sans Thai\',sans-serif;min-width:190px;line-height:1.6;">' +
+            '<div style="font-family:\'Noto Sans Thai\',sans-serif;min-width:190px;line-height:1.6;">' +
             '<div style="font-weight:700;font-size:14px;color:' + color + ';">' +
             '<i class="fa-solid fa-house-flood-water" style="margin-right:4px;"></i>' + office.name + '</div>' +
             '<div style="color:#666;font-size:11px;margin-bottom:6px;">รหัส ' + b.pwa_code + ' | เขต ' + b.zone + '</div>' +
@@ -355,7 +355,7 @@ function updateMapPopups(data) {
 
         marker.unbindTooltip();
         marker.bindTooltip(
-            '<div style="font-family:\'IBM Plex Sans Thai\',sans-serif;min-width:200px;line-height:1.5;">' +
+            '<div style="font-family:\'Noto Sans Thai\',sans-serif;min-width:200px;line-height:1.5;">' +
             '<div style="font-weight:700;font-size:13px;color:' + color + ';margin-bottom:4px;">เขต ' + zoneId + '</div>' +
             '<hr style="margin:0 0 4px 0;border:0;border-top:1px solid #e0e0e0;">' +
             '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px;">' +
@@ -481,7 +481,7 @@ function renderStats(data) {
         return '<div class="stat-card ' + s.color + ' fade-in" style="animation-delay:' + (i * 0.05) + 's">' +
             '<div class="stat-label">' + s.label + '</div>' +
             '<div class="stat-value">' + s.value + '</div>' +
-            '<div class="text-xs mt-1" style="color:var(--text-muted)">' + s.suffix + '</div>' +
+            '<div class="text-xs mt-1" style="color:rgba(255,255,255,0.75)">' + s.suffix + '</div>' +
             '</div>';
     }).join('');
 }
@@ -582,8 +582,8 @@ function renderLayerChart(data) {
                 legend: {
                     position: 'bottom',
                     labels: {
-                        color: '#94A3B8',
-                        font: { family: 'IBM Plex Sans Thai', size: 11 },
+                        color: '#4A4A4A',
+                        font: { family: 'Noto Sans Thai', size: 11 },
                         padding: 12,
                         usePointStyle: true,
                         pointStyleWidth: 8

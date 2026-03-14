@@ -7,6 +7,7 @@
 var chatbotOpen = false;
 var chatbotBusy = false;
 var chatMsgIdCounter = 0;
+var _chatbotPendingGeoJSON = null;
 
 /* ─── Toggle ─────────────────────────────── */
 function toggleChatbot() {
@@ -85,7 +86,7 @@ async function sendChatMessage() {
 
     } catch (e) {
         removeTypingIndicator(typingId);
-        appendChatMsg('bot', 'ไม่สามารถเชื่อมต่อบริการได้ค่ะ กรุณาลองใหม่อีกครั้ง');
+        appendChatMsg('bot', 'เกิดข้อผิดพลาดในการเชื่อมต่อ กรุณาลองใหม่อีกครั้งค่ะ');
     } finally {
         chatbotBusy = false;
         if (sendBtn) sendBtn.disabled = false;
@@ -127,11 +128,35 @@ function renderChatbotResponse(data) {
             appendChatMsg('bot', 'ไม่พบข้อมูลตำแหน่งที่ตรงตามเงื่อนไขค่ะ');
             return;
         }
-        appendChatMsg('bot',
-            'พบข้อมูล <strong>' + features.length.toLocaleString('th-TH') + '</strong> รายการค่ะ ' +
-            '<span class="chat-map-link" onclick="scrollToMap()"><i class="fa-solid fa-map-location-dot"></i> ดูบนแผนที่</span>'
-        );
-        renderChatbotGeoJSON(result);
+
+        // Check if map is available (detail page with layer loaded)
+        var mapAvailable = (typeof detailMap !== 'undefined' && detailMap) ||
+                           (document.getElementById('detailMapContainer') && typeof ensureMap === 'function');
+
+        if (mapAvailable) {
+            appendChatMsg('bot',
+                'พบข้อมูล <strong>' + features.length.toLocaleString('th-TH') + '</strong> รายการค่ะ ' +
+                '<span class="chat-map-link" onclick="scrollToMap()"><i class="fa-solid fa-map-location-dot"></i> ดูบนแผนที่</span>'
+            );
+            try {
+                renderChatbotGeoJSON(result);
+            } catch (mapErr) {
+                console.warn('[Chatbot] Map render error:', mapErr);
+                _chatbotPendingGeoJSON = result;
+                appendChatMsg('bot',
+                    '<span style="color:var(--text-muted);font-size:12px;">' +
+                    '<i class="fa-solid fa-circle-info" style="margin-right:4px;"></i>' +
+                    'ไม่สามารถแสดงแผนที่ได้ในขณะนี้ กรุณากด "ดูบนแผนที่" อีกครั้งค่ะ</span>'
+                );
+            }
+        } else {
+            appendChatMsg('bot',
+                'พบข้อมูล <strong>' + features.length.toLocaleString('th-TH') + '</strong> รายการค่ะ<br>' +
+                '<span style="color:var(--text-muted);font-size:12px;">' +
+                '<i class="fa-solid fa-circle-info" style="margin-right:4px;"></i>' +
+                'กรุณาเปิดหน้า "รายละเอียด" และเลือก Layer ก่อน เพื่อแสดงตำแหน่งบนแผนที่</span>'
+            );
+        }
 
     } else if (data.response_type === 'numeric') {
         renderChatNumeric(result);
@@ -282,7 +307,17 @@ function renderChatbotGeoJSON(geojson) {
         }
         // If map still not available, try again after a short delay
         if (!detailMap) {
-            setTimeout(function() { _addChatbotLayer(geojson); }, 500);
+            setTimeout(function() {
+                if (typeof detailMap !== 'undefined' && detailMap) {
+                    _addChatbotLayer(geojson);
+                } else {
+                    appendChatMsg('bot',
+                        '<span style="color:var(--text-muted);font-size:12px;">' +
+                        '<i class="fa-solid fa-circle-info" style="margin-right:4px;"></i>' +
+                        'กรุณาเลือก Layer เพื่อเปิดแผนที่ก่อน จากนั้นลองถามคำถามอีกครั้งค่ะ</span>'
+                    );
+                }
+            }, 800);
             return;
         }
     }
@@ -294,79 +329,88 @@ function _addChatbotLayer(geojson) {
     var map = (typeof detailMap !== 'undefined') ? detailMap : null;
     if (!map) return;
 
-    // Remove previous chatbot layers
-    var layerIds = ['chatbot-result-point', 'chatbot-result-line', 'chatbot-result-fill', 'chatbot-result-outline'];
-    for (var i = 0; i < layerIds.length; i++) {
-        if (map.getLayer(layerIds[i])) map.removeLayer(layerIds[i]);
+    function _doAdd() {
+        // Remove previous chatbot layers
+        var layerIds = ['chatbot-result-point', 'chatbot-result-line', 'chatbot-result-fill', 'chatbot-result-outline'];
+        for (var i = 0; i < layerIds.length; i++) {
+            if (map.getLayer(layerIds[i])) map.removeLayer(layerIds[i]);
+        }
+        if (map.getSource('chatbot-result')) map.removeSource('chatbot-result');
+
+        // Add source
+        map.addSource('chatbot-result', { type: 'geojson', data: geojson });
+
+        // Point layer
+        map.addLayer({
+            id: 'chatbot-result-point',
+            type: 'circle',
+            source: 'chatbot-result',
+            filter: ['==', '$type', 'Point'],
+            paint: {
+                'circle-radius': 6,
+                'circle-color': '#FF6B6B',
+                'circle-stroke-width': 2,
+                'circle-stroke-color': '#ffffff'
+            }
+        });
+
+        // Line layer
+        map.addLayer({
+            id: 'chatbot-result-line',
+            type: 'line',
+            source: 'chatbot-result',
+            filter: ['==', '$type', 'LineString'],
+            paint: {
+                'line-color': '#FF6B6B',
+                'line-width': 3
+            }
+        });
+
+        // Polygon fill
+        map.addLayer({
+            id: 'chatbot-result-fill',
+            type: 'fill',
+            source: 'chatbot-result',
+            filter: ['==', '$type', 'Polygon'],
+            paint: {
+                'fill-color': '#FF6B6B',
+                'fill-opacity': 0.25
+            }
+        });
+
+        // Polygon outline
+        map.addLayer({
+            id: 'chatbot-result-outline',
+            type: 'line',
+            source: 'chatbot-result',
+            filter: ['==', '$type', 'Polygon'],
+            paint: {
+                'line-color': '#FF6B6B',
+                'line-width': 2
+            }
+        });
+
+        // Add click popup for chatbot results
+        map.on('click', 'chatbot-result-point', function(e) { _chatbotPopup(e, map); });
+        map.on('click', 'chatbot-result-line', function(e) { _chatbotPopup(e, map); });
+        map.on('click', 'chatbot-result-fill', function(e) { _chatbotPopup(e, map); });
+
+        // Change cursor on hover
+        ['chatbot-result-point', 'chatbot-result-line', 'chatbot-result-fill'].forEach(function(lid) {
+            map.on('mouseenter', lid, function() { map.getCanvas().style.cursor = 'pointer'; });
+            map.on('mouseleave', lid, function() { map.getCanvas().style.cursor = ''; });
+        });
+
+        // Fit bounds
+        _fitChatbotBounds(map, geojson);
     }
-    if (map.getSource('chatbot-result')) map.removeSource('chatbot-result');
 
-    // Add source
-    map.addSource('chatbot-result', { type: 'geojson', data: geojson });
-
-    // Point layer
-    map.addLayer({
-        id: 'chatbot-result-point',
-        type: 'circle',
-        source: 'chatbot-result',
-        filter: ['==', '$type', 'Point'],
-        paint: {
-            'circle-radius': 6,
-            'circle-color': '#FF6B6B',
-            'circle-stroke-width': 2,
-            'circle-stroke-color': '#ffffff'
-        }
-    });
-
-    // Line layer
-    map.addLayer({
-        id: 'chatbot-result-line',
-        type: 'line',
-        source: 'chatbot-result',
-        filter: ['==', '$type', 'LineString'],
-        paint: {
-            'line-color': '#FF6B6B',
-            'line-width': 3
-        }
-    });
-
-    // Polygon fill
-    map.addLayer({
-        id: 'chatbot-result-fill',
-        type: 'fill',
-        source: 'chatbot-result',
-        filter: ['==', '$type', 'Polygon'],
-        paint: {
-            'fill-color': '#FF6B6B',
-            'fill-opacity': 0.25
-        }
-    });
-
-    // Polygon outline
-    map.addLayer({
-        id: 'chatbot-result-outline',
-        type: 'line',
-        source: 'chatbot-result',
-        filter: ['==', '$type', 'Polygon'],
-        paint: {
-            'line-color': '#FF6B6B',
-            'line-width': 2
-        }
-    });
-
-    // Add click popup for chatbot results
-    map.on('click', 'chatbot-result-point', function(e) { _chatbotPopup(e, map); });
-    map.on('click', 'chatbot-result-line', function(e) { _chatbotPopup(e, map); });
-    map.on('click', 'chatbot-result-fill', function(e) { _chatbotPopup(e, map); });
-
-    // Change cursor on hover
-    ['chatbot-result-point', 'chatbot-result-line', 'chatbot-result-fill'].forEach(function(lid) {
-        map.on('mouseenter', lid, function() { map.getCanvas().style.cursor = 'pointer'; });
-        map.on('mouseleave', lid, function() { map.getCanvas().style.cursor = ''; });
-    });
-
-    // Fit bounds
-    _fitChatbotBounds(map, geojson);
+    // Wait for map style to load before adding layers
+    if (map.isStyleLoaded()) {
+        _doAdd();
+    } else {
+        map.once('load', function() { _doAdd(); });
+    }
 }
 
 function _chatbotPopup(e, map) {
@@ -416,6 +460,21 @@ function scrollToMap() {
     if (mapEl) {
         mapEl.style.display = 'block';
         mapEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    // Retry pending GeoJSON that failed to render earlier
+    if (_chatbotPendingGeoJSON) {
+        var pending = _chatbotPendingGeoJSON;
+        _chatbotPendingGeoJSON = null;
+        try {
+            renderChatbotGeoJSON(pending);
+        } catch (e) {
+            console.warn('[Chatbot] Retry map render failed:', e);
+            appendChatMsg('bot',
+                '<span style="color:var(--text-muted);font-size:12px;">' +
+                '<i class="fa-solid fa-triangle-exclamation" style="margin-right:4px;"></i>' +
+                'ไม่สามารถแสดงข้อมูลบนแผนที่ได้ กรุณาลองเปิด Layer ใหม่แล้วถามอีกครั้งค่ะ</span>'
+            );
+        }
     }
 }
 

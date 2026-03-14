@@ -63,9 +63,15 @@ func RegisterRoutes(router *gin.Engine) {
 			// Add API route for monitoring cache status
 			api.GET("/cache/status", handlers.GetCacheStatus)
 			api.GET("/features/list", handlers.GetFeaturesList)
+			api.GET("/features/suggest", handlers.GetFeatureSuggestions)
+			api.GET("/features/facets", handlers.GetFeatureFacets)
 			api.GET("/field-mapping", handlers.GetFieldMapping)
 			// Session info (for permission-aware UI)
 			api.GET("/session/info", handlers.GetSessionInfo)
+
+			// Advanced Query Builder
+			api.POST("/features/advanced-query", handlers.AdvancedQuery)
+			api.POST("/features/advanced-query/export", handlers.AdvancedQueryExport)
 
 			// Chatbot — text-to-query (proxy to Python service)
 			api.POST("/chatbot/query", handlers.ChatbotQuery)

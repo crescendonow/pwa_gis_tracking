@@ -20,9 +20,14 @@
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
     />
+    <!-- AG Grid Community -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@32.3.3/styles/ag-grid.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@32.3.3/styles/ag-theme-alpine.css" />
+    <script src="https://cdn.jsdelivr.net/npm/ag-grid-community@32.3.3/dist/ag-grid-community.min.noStyle.js"></script>
     <link rel="stylesheet" href="/pwa_gis_tracking/static/css/style.css" />
     <link rel="stylesheet" href="/pwa_gis_tracking/static/css/responsive.css" />
     <link rel="stylesheet" href="/pwa_gis_tracking/static/css/chatbot.css" />
+    <link rel="stylesheet" href="/pwa_gis_tracking/static/css/advanced_query.css" />
     <style>
       #detailMapContainer {
         display: none;
@@ -34,32 +39,32 @@
       }
       /* Map popup */
       .maplibregl-popup-content {
-        background: #1c2538;
-        color: #f1f5f9;
-        border: 1px solid rgba(148, 163, 184, 0.15);
+        background: #FFFFFF;
+        color: #1A1A1A;
+        border: 1px solid rgba(0, 0, 0, 0.12);
         border-radius: 10px;
         padding: 0;
         max-width: 380px;
         max-height: 420px;
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
       }
       .maplibregl-popup-close-button {
-        color: #94a3b8;
+        color: #4A4A4A;
         font-size: 18px;
         padding: 4px 8px;
       }
       .maplibregl-popup-close-button:hover {
-        color: #fff;
+        color: #1A1A1A;
       }
       .maplibregl-popup-tip {
-        border-top-color: #1c2538;
+        border-top-color: #FFFFFF;
       }
       .popup-header {
         padding: 10px 14px;
-        border-bottom: 1px solid rgba(148, 163, 184, 0.1);
-        font-weight: 600;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+        font-weight: 700;
         font-size: 13px;
-        color: #d4a843;
+        color: #3F74CA;
       }
       .popup-body {
         padding: 8px 14px;
@@ -73,18 +78,18 @@
       }
       .popup-body td {
         padding: 3px 0;
-        border-bottom: 1px solid rgba(148, 163, 184, 0.05);
+        border-bottom: 1px solid rgba(0, 0, 0, 0.04);
         vertical-align: top;
       }
       .popup-body td:first-child {
-        color: #94a3b8;
-        font-weight: 500;
+        color: #4A4A4A;
+        font-weight: 600;
         padding-right: 10px;
         white-space: nowrap;
         width: 40%;
       }
       .popup-body td:last-child {
-        color: #f1f5f9;
+        color: #1A1A1A;
         word-break: break-all;
       }
 
@@ -99,19 +104,19 @@
         margin-bottom: 12px;
       }
       .perm-banner.perm-all {
-        background: rgba(212, 168, 67, 0.15);
-        border: 1px solid rgba(212, 168, 67, 0.3);
-        color: #d4a843;
+        background: rgba(62, 186, 150, 0.1);
+        border: 1px solid rgba(62, 186, 150, 0.25);
+        color: #15866B;
       }
       .perm-banner.perm-reg {
-        background: rgba(52, 152, 219, 0.15);
-        border: 1px solid rgba(52, 152, 219, 0.3);
-        color: #3498db;
+        background: rgba(63, 116, 202, 0.1);
+        border: 1px solid rgba(63, 116, 202, 0.25);
+        color: #355398;
       }
       .perm-banner.perm-branch {
-        background: rgba(46, 204, 113, 0.15);
-        border: 1px solid rgba(46, 204, 113, 0.3);
-        color: #2ecc71;
+        background: rgba(62, 186, 150, 0.1);
+        border: 1px solid rgba(62, 186, 150, 0.25);
+        color: #15866B;
       }
 
       /* Dual list for drag-drop */
@@ -160,7 +165,7 @@
         transition: background 0.15s;
       }
       .dual-list-item:hover {
-        background: rgba(148, 163, 184, 0.1);
+        background: rgba(63, 116, 202, 0.06);
       }
       .dual-list-item .grip {
         color: var(--text-muted);
@@ -183,10 +188,10 @@
       }
       .sortable-ghost {
         opacity: 0.4;
-        background: rgba(212, 168, 67, 0.2) !important;
+        background: rgba(62, 186, 150, 0.15) !important;
       }
       .sortable-chosen {
-        background: rgba(52, 152, 219, 0.15) !important;
+        background: rgba(63, 116, 202, 0.1) !important;
       }
 
       /* Layer checkbox grid */
@@ -212,8 +217,8 @@
         border-color: var(--text-muted);
       }
       .layer-chip.selected {
-        border-color: var(--pwa-gold);
-        background: rgba(212, 168, 67, 0.1);
+        border-color: var(--pwa-blue);
+        background: rgba(63, 116, 202, 0.08);
       }
       .layer-chip .dot {
         width: 10px;
@@ -254,15 +259,15 @@
         color: var(--text-primary);
       }
       .map-ctrl-btn.active {
-        border-color: var(--pwa-gold);
-        color: var(--pwa-gold);
+        border-color: var(--pwa-blue);
+        color: var(--pwa-blue);
       }
       .map-layer-panel {
         position: absolute;
         top: 10px;
         left: 10px;
         z-index: 10;
-        background: rgba(28, 37, 56, 0.95);
+        background: rgba(255, 255, 255, 0.95);
         border: 1px solid var(--border);
         border-radius: 8px;
         padding: 8px;
@@ -281,10 +286,10 @@
         border-radius: 4px;
       }
       .map-layer-toggle:hover {
-        background: rgba(148, 163, 184, 0.1);
+        background: rgba(63, 116, 202, 0.06);
       }
       .map-layer-toggle input {
-        accent-color: var(--pwa-gold);
+        accent-color: var(--pwa-blue);
       }
       .map-layer-toggle .ldot {
         width: 8px;
@@ -346,7 +351,7 @@
       .map-footer {
         padding: 8px 20px;
         font-size: 12px;
-        color: #64748b;
+        color: #757575;
         display: flex;
         align-items: center;
         justify-content: space-between;
@@ -373,7 +378,7 @@
         class="max-w-screen-2xl mx-auto px-4 py-3 flex items-center justify-between"
       >
         <div class="nav-brand">
-          <div class="logo-icon">GIS</div>
+          <div class="logo-icon"><img src="/pwa_gis_tracking/static/images/pwa-logo.jpg" alt="PWA" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;"></div>
           <div>
             <h1>PWA GIS Online Tracking</h1>
             <span>ระบบติดตามข้อมูล GIS ออนไลน์</span>
@@ -448,6 +453,9 @@
               <button class="btn btn-primary flex-1" onclick="executeQuery()">
                 <i class="fa-solid fa-magnifying-glass"></i> ค้นหา
               </button>
+              <button class="btn flex-1" onclick="openAdvancedQuery()" style="background:var(--surface-2);border:1px solid var(--pwa-blue);color:var(--pwa-blue);">
+                <i class="fa-solid fa-filter"></i> การค้นหาขั้นสูง
+              </button>
               <button
                 class="btn"
                 onclick="resetSelection()"
@@ -478,7 +486,7 @@
                   class="text-xs px-2 py-1 rounded"
                   style="
                     color: var(--pwa-gold);
-                    background: rgba(212, 168, 67, 0.1);
+                    background: rgba(62, 186, 150, 0.1);
                   "
                   onclick="selectAllLayers()"
                 >
@@ -671,7 +679,7 @@
                       class="text-xs px-2 py-1 rounded"
                       style="
                         color: var(--pwa-gold);
-                        background: rgba(212, 168, 67, 0.1);
+                        background: rgba(62, 186, 150, 0.1);
                       "
                       onclick="addAllExportLayers()"
                     >
@@ -757,6 +765,7 @@
     <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/th.js"></script>
     <script src="/pwa_gis_tracking/static/js/thai_custom_date.js"></script>
     <script src="/pwa_gis_tracking/static/js/layer_modal.js"></script>
+    <script src="/pwa_gis_tracking/static/js/advanced_query.js"></script>
     <script src="/pwa_gis_tracking/static/js/detail.js"></script>
 
     <script>
@@ -783,7 +792,7 @@
         </div>
         <div class="chatbot-header-text">
           <div class="chatbot-title">น้องหนึ่งน้ำ</div>
-          <div class="chatbot-subtitle">ผู้ช่วย GIS อัจฉริยะ</div>
+          <div class="chatbot-subtitle">ผู้ช่วย GIS </div>
         </div>
         <button onclick="toggleChatbot()" class="chatbot-close">&times;</button>
       </div>
@@ -798,6 +807,10 @@
               <li onclick="askSuggestion('จำนวนมาตรวัดน้ำทั้งหมดในสาขา')">จำนวนมาตรวัดน้ำทั้งหมดในสาขา</li>
               <li onclick="askSuggestion('ท่อขนาด 100 มม. ยาวรวมกี่เมตร')">ท่อขนาด 100 มม. ยาวรวมกี่เมตร</li>
               <li onclick="askSuggestion('ขอรายชื่อสาขาทั้งหมดในเขต 2')">ขอรายชื่อสาขาทั้งหมดในเขต 2</li>
+              <li onclick="askSuggestion('จำนวนมาตรตายรายสาขา')">จำนวนมาตรตายรายสาขา</li>
+              <li onclick="askSuggestion('จำนวนจุดซ่อมท่อขนาด 100 ขึ้นไปแยกตามชนิด')">จุดซ่อมท่อขนาด 100 ขึ้นไปแยกตามชนิด</li>
+              <li onclick="askSuggestion('ความยาวท่อจ่ายน้ำขนาด 100 ขึ้นไป อายุมากกว่า 30 ปี')">ท่อจ่ายน้ำขนาด 100 อายุมากกว่า 30 ปี</li>
+              <li onclick="askSuggestion('ข้อมูลสถานีผลิตโรงกรองน้ำ')">ข้อมูลสถานีผลิต/โรงกรองน้ำ</li>
             </ul>
           </div>
         </div>
