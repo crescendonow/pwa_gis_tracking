@@ -82,7 +82,8 @@ async def _call_gemini(messages, timeout=None):
                                         "type": "STRING",
                                         "enum": [
                                             "pipe", "valve", "firehydrant", "meter",
-                                            "bldg", "leakpoint", "pwa_waterworks", "dma_boundary",
+                                            "bldg", "leakpoint", "pwa_waterworks", "struct",
+                                            "pipe_serv", "dma_boundary", "step_test", "flow_meter",
                                         ],
                                     },
                                     "pipeline": {"type": "ARRAY", "items": {"type": "OBJECT"}},

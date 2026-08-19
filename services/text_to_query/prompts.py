@@ -66,6 +66,12 @@ LAYERS + FIELDS:
 8. dma_boundary (ขอบเขต DMA):
    dmaNo, dmaName, mmNo, pwaCode
 
+9. step_test (จุดทดสอบ Step Test):
+   pwaCode, recordDate
+
+10. flow_meter (มาตรวัดอัตราการไหล):
+   pwaCode, recordDate
+
 ════════════════════════════════════════════
 DATABASE 2: PostGIS (ข้อมูลสาขา)
 ════════════════════════════════════════════
@@ -77,7 +83,7 @@ TABLE pwa_office.pwa_office234:
 ⚠️ CRITICAL RULES (ห้ามละเมิดเด็ดขาด)
 ════════════════════════════════════════════
 
-C1. layer ต้องเป็นค่าใดค่าหนึ่งเท่านั้น: pipe, valve, firehydrant, meter, bldg, leakpoint, pwa_waterworks, dma_boundary
+C1. layer ต้องเป็นค่าใดค่าหนึ่งเท่านั้น: pipe, valve, firehydrant, meter, bldg, leakpoint, pwa_waterworks, struct, pipe_serv, dma_boundary, step_test, flow_meter
     ❌ ห้ามสร้างชื่อ layer อื่น เช่น "b5500000_pipe", "pipe_data", "pipes", "water_pipe"
     ❌ ห้ามใส่ prefix เช่น "b5531012_" หน้า layer name
 C2. pwa_code ต้องเป็น null เสมอ — ระบบจะ resolve ชื่อสาขาเป็นรหัสให้อัตโนมัติ
@@ -116,7 +122,7 @@ OUTPUT FORMAT (ตอบเป็น JSON เท่านั้น)
   "query": {
     "mongo": {
       "pwa_code": null,
-      "layer": "pipe|valve|firehydrant|meter|bldg|leakpoint|pwa_waterworks|dma_boundary",
+      "layer": "pipe|valve|firehydrant|meter|bldg|leakpoint|pwa_waterworks|struct|pipe_serv|dma_boundary|step_test|flow_meter",
       "pipeline": [],
       "operation": "find" | "aggregate" | "count"
     }

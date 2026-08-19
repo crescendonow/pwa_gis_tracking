@@ -104,6 +104,20 @@ func AdvancedQueryExport(c *gin.Context) {
 	filename := fmt.Sprintf("%s_%s_query", req.PwaCode, req.Collection)
 	auditDetail := fmt.Sprintf("%s:%s", req.PwaCode, req.Collection)
 
+	// Requirement 1.2: users whose download_tier is not "full" may only
+	// export csv/xlsx. Format is in the JSON body here (not a query string),
+	// so it can't be gated by the RequireFullDownload middleware — check it
+	// directly, after the "" -> "csv" default so the default always passes.
+	if !services.IsFormatAllowed(DownloadTierOf(c), req.Format) {
+		LogAuditEvent(c, "export_denied_"+req.Format, "export", auditDetail)
+		c.JSON(http.StatusForbidden, gin.H{
+			"status":  "error",
+			"code":    "download_forbidden",
+			"message": "สิทธิ์ของคุณดาวน์โหลดได้เฉพาะไฟล์ Excel และ CSV เท่านั้น",
+		})
+		return
+	}
+
 	// Get GeoJSON with geometry
 	geojsonData, err := services.ExportAdvancedQueryAsGeoJSON(&req.AdvancedQueryRequest)
 	if err != nil {

@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"pwa_gis_tracking/config"
+	"pwa_gis_tracking/services"
 
 	"github.com/gin-gonic/gin"
 )
@@ -21,6 +22,8 @@ import (
 //	  "pwa_code":         "1020",
 //	  "permission":       "leak",
 //	  "permission_leak":  "all",    // "all"|"reg"|"branch"
+//	  "download_tier":    "full",   // "full"|"basic"
+//	  "allowed_formats":  ["xlsx","csv","geojson", ...],
 //	  "area":             "3",      // zone number
 //	  "job_name":         "งานแผนที่แนวท่อ",
 //	  "division":         "กองเทคโนโลยี...",
@@ -33,6 +36,13 @@ func GetSessionInfo(c *gin.Context) {
 		return
 	}
 
+	// Sessions created before this deploy won't have download_tier set —
+	// fall back to the most restrictive tier, "basic".
+	tier, _ := session.Values[sessDownloadTier].(string)
+	if tier == "" {
+		tier = services.TierBasic
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"status":          "success",
 		"uid":             session.Values[sessUID],
@@ -40,6 +50,8 @@ func GetSessionInfo(c *gin.Context) {
 		"pwa_code":        session.Values[sessPwaCode],
 		"permission":      session.Values[sessPermission],
 		"permission_leak": session.Values[sessPermLeak],
+		"download_tier":   tier,
+		"allowed_formats": services.AllowedFormats(tier),
 		"area":            session.Values[sessArea],
 		"job_name":        session.Values[sessJobName],
 		"division":        session.Values[sessDivision],

@@ -47,6 +47,10 @@ LAYER_KEYWORDS = {
     # dma_boundary
     "ขอบเขต dma": ("dma_boundary", "ขอบเขต DMA"),
     "dma": ("dma_boundary", "DMA"),
+    # step_test
+    "จุดทดสอบ step test": ("step_test", "จุดทดสอบ Step Test"),
+    "จุดทดสอบ": ("step_test", "จุดทดสอบ Step Test"),
+    "step test": ("step_test", "จุดทดสอบ Step Test"),
 }
 
 # Sort keywords longest first so "ท่อประปา" matches before "ท่อ"

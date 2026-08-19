@@ -49,6 +49,47 @@ var AdvancedQuery = (function () {
   var modalEl = null;
   var nextId = 1;
   var BASE = "/pwa_gis_tracking";
+  var _tier = null; // cached download_tier ("full" | "basic"), Requirement 1.2
+
+  // ═══════════════════════════════════════════════
+  // Download Tier (Requirement 1.2)
+  // นักวิชาการภูมิสารสนเทศ/หัวหน้างาน/ผอ.กอง/ผู้บริหาร ได้ "full" (ทุกฟอร์แมต)
+  // คนอื่นได้ "basic" (เฉพาะ Excel/CSV) — ซ่อนปุ่ม export ที่ data-tier="full"
+  // ═══════════════════════════════════════════════
+  function getTier() {
+    // detail.js (the only page that opens this modal) sets window.userSession
+    // before the user can trigger open(), so prefer that; fall back to our
+    // own cached fetch so this module keeps working if reused elsewhere.
+    if (window.userSession && window.userSession.download_tier) {
+      return window.userSession.download_tier;
+    }
+    return _tier || "basic";
+  }
+
+  function refreshTierThenApply() {
+    if (window.userSession && window.userSession.download_tier) {
+      applyExportTierUI();
+      return;
+    }
+    fetch(BASE + "/api/session/info", { credentials: "same-origin" })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        _tier = (data && data.download_tier) || "basic";
+        applyExportTierUI();
+      })
+      .catch(function () {
+        _tier = "basic";
+        applyExportTierUI();
+      });
+  }
+
+  function applyExportTierUI() {
+    var tier = getTier();
+    var btns = modalEl ? modalEl.querySelectorAll('.aq-export-btns [data-tier="full"]') : [];
+    for (var i = 0; i < btns.length; i++) {
+      btns[i].style.display = tier === "full" ? "" : "none";
+    }
+  }
 
   // ═══════════════════════════════════════════════
   // Condition Model
@@ -156,11 +197,11 @@ var AdvancedQuery = (function () {
       '      <div class="aq-export-btns">' +
       '        <span class="aq-export-label">Export:</span>' +
       '        <button class="aq-btn aq-btn-xs" onclick="AdvancedQuery._export(\'csv\')">CSV</button>' +
-      '        <button class="aq-btn aq-btn-xs" onclick="AdvancedQuery._export(\'geojson\')">GeoJSON</button>' +
-      '        <button class="aq-btn aq-btn-xs" onclick="AdvancedQuery._export(\'gpkg\')">GPKG</button>' +
-      '        <button class="aq-btn aq-btn-xs" onclick="AdvancedQuery._export(\'shp\')">SHP</button>' +
-      '        <button class="aq-btn aq-btn-xs" onclick="AdvancedQuery._export(\'fgb\')">FGB</button>' +
-      '        <button class="aq-btn aq-btn-xs" onclick="AdvancedQuery._export(\'pmtiles\')">PMTiles</button>' +
+      '        <button class="aq-btn aq-btn-xs" data-tier="full" onclick="AdvancedQuery._export(\'geojson\')">GeoJSON</button>' +
+      '        <button class="aq-btn aq-btn-xs" data-tier="full" onclick="AdvancedQuery._export(\'gpkg\')">GPKG</button>' +
+      '        <button class="aq-btn aq-btn-xs" data-tier="full" onclick="AdvancedQuery._export(\'shp\')">SHP</button>' +
+      '        <button class="aq-btn aq-btn-xs" data-tier="full" onclick="AdvancedQuery._export(\'fgb\')">FGB</button>' +
+      '        <button class="aq-btn aq-btn-xs" data-tier="full" onclick="AdvancedQuery._export(\'pmtiles\')">PMTiles</button>' +
       "      </div>" +
       "    </div>" +
       '    <div id="aqGrid" class="aq-grid ag-theme-alpine-dark"></div>' +
@@ -258,6 +299,9 @@ var AdvancedQuery = (function () {
       pwa_waterworks: "สถานีผลิต",
       struct: "สิ่งก่อสร้าง",
       pipe_serv: "ท่อบริการ",
+      dma_boundary: "ขอบเขต DMA",
+      step_test: "จุดทดสอบ Step Test",
+      flow_meter: "มาตรวัดอัตราการไหล",
     };
     for (var i = 0; i < state.availableLayers.length; i++) {
       var lyr = state.availableLayers[i];
@@ -278,6 +322,7 @@ var AdvancedQuery = (function () {
 
     modalEl.style.display = "";
     document.body.style.overflow = "hidden";
+    refreshTierThenApply();
 
     loadFieldMapping(function () {
       renderConditions();
@@ -1039,6 +1084,15 @@ var AdvancedQuery = (function () {
   // Export
   // ═══════════════════════════════════════════════
   function exportResults(format) {
+    // Requirement 1.2: csv (and xlsx, unused here) are allowed for everyone;
+    // every other format requires download_tier == "full". Server also gates
+    // this (AdvancedQueryExport), but check client-side first for instant
+    // feedback instead of a blob-parsing 403 round-trip.
+    if (format !== "csv" && format !== "xlsx" && getTier() !== "full") {
+      alert("สิทธิ์ของคุณดาวน์โหลดได้เฉพาะไฟล์ Excel และ CSV เท่านั้น");
+      return;
+    }
+
     var conditions = serializeConditions(state.conditions);
     if (!conditions || !conditions.rules || conditions.rules.length === 0) {
       alert("กรุณาเพิ่มเงื่อนไขก่อน export");

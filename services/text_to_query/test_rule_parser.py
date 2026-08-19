@@ -383,6 +383,18 @@ def test_pwa_code_passthrough():
 # Run
 # ═══════════════════════════════════════════════════════════
 
+def test_new_layer_keywords():
+    cases = [
+        ("จำนวนขอบเขต DMA ทั้งหมด", "dma_boundary"),
+        ("จำนวนจุดทดสอบ Step Test ทั้งหมด", "step_test"),
+        ("จำนวนมาตรวัดอัตราการไหลทั้งหมด", "flow_meter"),
+    ]
+    for prompt, expected_layer in cases:
+        result = _assert_rule(prompt, pwa_code="5531012")
+        assert result["query"]["mongo"]["layer"] == expected_layer
+        assert result["query"]["mongo"]["operation"] == "count"
+
+
 if __name__ == "__main__":
     import traceback
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_")]

@@ -31,7 +31,10 @@ var LAYER_MAP_CONFIG = {
     leakpoint:      { color: '#F39C12', icon: '/pwa_gis_tracking/static/icons/Leakpoint.svg',     type: 'point' },
     pwa_waterworks: { color: '#1ABC9C', icon: '/pwa_gis_tracking/static/icons/PWASmall.svg',      type: 'point' },
     struct:         { color: '#34495E', icon: null,                                              type: 'polygon' },
-    pipe_serv:      { color: '#D35400', icon: null,                                              type: 'line' }
+    pipe_serv:      { color: '#D35400', icon: null,                                              type: 'line' },
+    dma_boundary:   { color: '#00A6A6', icon: null,                                              type: 'polygon' },
+    step_test:      { color: '#8E44AD', icon: null,                                              type: 'point' },
+    flow_meter:     { color: '#2E86DE', icon: null,                                              type: 'point' }
 };
 // Pipe color by sizeId (diameter in มม.) — from คำอธิบายสัญลักษณ์ท่อประปา legend
 var PIPE_SIZE_COLORS = {
@@ -46,7 +49,8 @@ var PIPE_SIZE_COLORS = {
     '800': '#000080', '900': '#800080', '1000': '#00FF00',
     '1100': '#FF6347', '1200': '#FF6347', '1500': '#FF6347', '2000': '#FF6347'
 };
-var LAYER_COLORS = ['#3498DB', '#E74C3C', '#2ECC71', '#F39C12', '#9B59B6', '#1ABC9C', '#E67E22', '#34495E', '#D35400'];
+// Ordered to match services.GetAllLayerNames and LAYER_MAP_CONFIG.
+var LAYER_COLORS = ['#E67E22', '#9B59B6', '#E74C3C', '#3498DB', '#2E86DE', '#2ECC71', '#F39C12', '#00A6A6', '#8E44AD', '#1ABC9C', '#34495E', '#D35400'];
 
 // Zone centers cache (loaded from /api/zones/centers)
 var zoneCentersCache = {};
@@ -86,7 +90,36 @@ async function loadSessionInfo() {
             '<span>สิทธิ์การใช้งาน: <strong>' + (permText[permLevel] || permLevel) + '</strong></span>' +
             (permLevel === 'reg' ? ' — เขต ' + (userSession.area || '') : '') +
             (permLevel === 'branch' ? ' — สาขา ' + (userSession.pwa_code || '') : '');
+        applyDownloadTierUI();
     } catch (e) { console.error('Session load error:', e); }
+}
+
+/* ─── Download Tier (Requirement 1.2) ───────────
+   นักวิชาการภูมิสารสนเทศ/หัวหน้างาน/ผอ.กอง/ผู้บริหาร ได้ tier "full" (ทุกฟอร์แมต)
+   คนอื่นได้ tier "basic" (เฉพาะ Excel/CSV) — ซ่อน option/ปุ่มที่ต้องใช้สิทธิ์ full ทิ้ง */
+function applyDownloadTierUI() {
+    var tier = userSession.download_tier || 'basic';
+    if (tier === 'full') return;
+
+    // 1) ลบ option ที่ต้องใช้สิทธิ์ full ออกจาก dropdown รูปแบบไฟล์
+    var sel = document.getElementById('exportFormat');
+    if (sel) {
+        Array.prototype.slice.call(sel.querySelectorAll('option[data-tier="full"]'))
+            .forEach(function (o) { o.remove(); });
+    }
+
+    // 2) ปิดปุ่ม Download GeoData เพราะเหลือแต่ format ที่ต้องใช้สิทธิ์ full
+    var geoBtn = document.querySelector('button[onclick="exportGeoData()"]');
+    if (geoBtn) {
+        geoBtn.disabled = true;
+        geoBtn.style.opacity = '.5';
+        geoBtn.style.cursor = 'not-allowed';
+        geoBtn.title = 'สิทธิ์ของคุณดาวน์โหลดได้เฉพาะไฟล์ Excel และ CSV เท่านั้น';
+    }
+
+    // 3) แสดงข้อความเตือนเหนือปุ่ม Download GeoData
+    var notice = document.getElementById('exportTierNotice');
+    if (notice) notice.style.display = '';
 }
 
 /* ─── Load Data ──────────────────────────────── */
@@ -1099,6 +1132,12 @@ function populateExportLayers() {
 function addAllExportLayers() { populateExportLayers(); updateMergeModeOptions(); }
 
 function exportGeoData() {
+    // Requirement 1.2: export ผ่าน iframe ไม่แสดง error 403 ให้ผู้ใช้เห็น
+    // ต้องกันที่ฝั่ง JS ก่อนยิง request (server ยัง gate อยู่ด้วยเผื่อ JS ถูก bypass)
+    if ((userSession.download_tier || 'basic') !== 'full') {
+        showToast('สิทธิ์ของคุณดาวน์โหลดได้เฉพาะ Excel และ CSV เท่านั้น', 'error');
+        return;
+    }
     if (selectedBranches.length === 0) { showToast('กรุณาเลือกสาขา', 'error'); return; }
     var format = document.getElementById('exportFormat').value;
     var exportItems = document.querySelectorAll('#exportLayerList .export-layer-item');

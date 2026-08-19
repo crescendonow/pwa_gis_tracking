@@ -36,11 +36,14 @@ var LayerConfigs = map[string]LayerConfig{
 	"pwa_waterworks": {CountFields: []string{"globalId", "_id"}, DateField: "_createdAt"},
 	"struct":         {CountFields: []string{"globalId", "_id"}, DateField: "_createdAt"},
 	"pipe_serv":      {CountFields: []string{"globalId", "_id"}, DateField: "_createdAt"},
+	"dma_boundary":   {CountFields: []string{"globalId", "_id"}, DateField: "recordDate"},
+	"step_test":      {CountFields: []string{"globalId", "_id"}, DateField: "recordDate"},
+	"flow_meter":     {CountFields: []string{"globalId", "_id"}, DateField: "recordDate"},
 }
 
 // GetAllLayerNames returns all supported layer names in display order.
 func GetAllLayerNames() []string {
-	return []string{"pipe", "valve", "firehydrant", "meter", "bldg", "leakpoint", "pwa_waterworks", "struct", "pipe_serv"}
+	return []string{"pipe", "valve", "firehydrant", "meter", "flow_meter", "bldg", "leakpoint", "dma_boundary", "step_test", "pwa_waterworks", "struct", "pipe_serv"}
 }
 
 // FindCollectionID looks up the MongoDB collection ObjectID from the "collections"
@@ -527,9 +530,9 @@ func ExportFeaturesForMap(pwaCode, layerName, startDate, endDate string) ([]byte
 
 	// Lightweight projection: geometry + _id + sizeId (for pipe coloring by diameter)
 	projection := options.Find().SetProjection(bson.M{
-		"geometry":           1,
-		"_id":                1,
-		"properties.sizeId":  1,
+		"geometry":          1,
+		"_id":               1,
+		"properties.sizeId": 1,
 	})
 
 	cursor, err := featuresCol.Find(ctx, filter, projection)
@@ -655,6 +658,9 @@ func GetLayerDisplayName(layer string) string {
 		"pwa_waterworks": "ตำแหน่งสำนักงาน",
 		"struct":         "รั้วบ้าน",
 		"pipe_serv":      "ท่อบริการ",
+		"dma_boundary":   "ขอบเขต DMA",
+		"step_test":      "จุดทดสอบ Step Test",
+		"flow_meter":     "มาตรวัดอัตราการไหล",
 	}
 	if n, ok := names[layer]; ok {
 		return n
@@ -758,9 +764,9 @@ func ExportMergedFeaturesAsGeoJSON(pwaCodes []string, layerNames []string, start
 		"type":     "FeatureCollection",
 		"features": allFeatures,
 		"metadata": map[string]interface{}{
-			"pwaCodes":   pwaCodes,
-			"layers":     layerNames,
-			"count":      len(allFeatures),
+			"pwaCodes":    pwaCodes,
+			"layers":      layerNames,
+			"count":       len(allFeatures),
 			"mergeExport": true,
 		},
 	}

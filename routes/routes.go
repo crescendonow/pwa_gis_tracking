@@ -56,7 +56,12 @@ func RegisterRoutes(router *gin.Engine) {
 			api.GET("/counts", handlers.GetBranchCounts)
 			api.GET("/dashboard", handlers.GetDashboardSummary)
 			api.GET("/export/excel", handlers.ExportExcel)
-			api.GET("/export/geodata", handlers.ExportGeoData)
+			// Requirement 1.2: geodata formats (geojson/gpkg/shp/fgb/tab/pmtiles/
+			// mbtiles) require download_tier == "full"; /export/excel stays
+			// ungated since xlsx is allowed for everyone.
+			api.GET("/export/geodata",
+				handlers.RequireFullDownload("format", "geojson"),
+				handlers.ExportGeoData)
 			api.GET("/features/map", handlers.GetFeaturesForMap)
 			api.GET("/features/properties", handlers.GetFeatureProps)
 			api.GET("/cache/invalidate", handlers.InvalidateCache)

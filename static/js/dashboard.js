@@ -31,8 +31,10 @@ var ZONE_COLORS = [
 
 // Color palette for GIS layers
 var LAYER_COLORS = [
-    '#3498DB', '#E74C3C', '#2ECC71', '#F39C12', '#9B59B6',
-    '#1ABC9C', '#E67E22', '#34495E', '#D35400'
+    // Ordered to match services.GetAllLayerNames and detail-map colors.
+    '#E67E22', '#9B59B6', '#E74C3C', '#3498DB', '#2E86DE',
+    '#2ECC71', '#F39C12', '#00A6A6', '#8E44AD', '#1ABC9C',
+    '#34495E', '#D35400'
 ];
 
 // PWA Zone office centers (loaded from PostGIS /api/zones/centers)

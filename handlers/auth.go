@@ -31,11 +31,12 @@ import (
 
 // Using typed constants avoids typo-prone bare string keys scattered around.
 const (
-	sessUserID       = "ses_userid"   // gorilla session ID token
+	sessUserID       = "ses_userid" // gorilla session ID token
 	sessUname        = "uname"
 	sessPwaCode      = "pwacode"
 	sessPermission   = "permission"
 	sessPermLeak     = "permission_leak"
+	sessDownloadTier = "download_tier"
 	sessArea         = "area"
 	sessJobName      = "job_name"
 	sessDivision     = "division"
@@ -107,16 +108,18 @@ func HandleLogin(c *gin.Context) {
 		return
 	}
 
-	// 4. Resolve RBAC permission (replaces the big if-else block)
-	perm := services.ResolvePermission(user.DepName, user.DivName, user.JobName, user.User)
-	if !services.IsAuthorised(perm) {
-		c.JSON(http.StatusForbidden, gin.H{
-			"result":  "N_Rights",
-			"message": "คุณไม่มีสิทธิ์เข้าใช้งานระบบนี้",
-			"link":    "./",
-		})
-		return
-	}
+	// 4. Resolve RBAC permission (replaces the big if-else block).
+	// Requirement 1: every employee authenticated by the intranet API may
+	// log in — there is no longer a rejection step here. Users who don't
+	// match any allow-list get the narrowest data scope ("branch") and the
+	// most restrictive download tier ("basic") from ResolvePermission.
+	perm := services.ResolvePermission(services.PermissionInput{
+		DepName:  user.DepName,
+		DivName:  user.DivName,
+		JobName:  user.JobName,
+		Position: user.Position,
+		UserID:   user.User,
+	})
 
 	// 5. Query pwa_code from PostgreSQL (parameterised — no SQL injection)
 	pwaCode, err := services.LookupPwaCode(user.BA)
@@ -136,18 +139,19 @@ func HandleLogin(c *gin.Context) {
 
 	fullName := user.Myname + " " + user.MySurname
 
-	session.Values[sessUserID]      = user.User // employee ID (session.ID is empty for CookieStore)
-	session.Values[sessUname]       = fullName
-	session.Values[sessPwaCode]     = pwaCode
-	session.Values[sessPermission]  = perm.Permission
-	session.Values[sessPermLeak]    = perm.PermissionLeak
-	session.Values[sessArea]        = user.Area
-	session.Values[sessJobName]     = user.JobName
-	session.Values[sessDivision]    = user.DivName
-	session.Values[sessInsitution]  = user.DepName
-	session.Values[sessPosition]    = user.Position
-	session.Values[sessLvl]         = user.Level
-	session.Values[sessUID]         = user.User
+	session.Values[sessUserID] = user.User // employee ID (session.ID is empty for CookieStore)
+	session.Values[sessUname] = fullName
+	session.Values[sessPwaCode] = pwaCode
+	session.Values[sessPermission] = perm.Permission
+	session.Values[sessPermLeak] = perm.PermissionLeak
+	session.Values[sessDownloadTier] = perm.DownloadTier
+	session.Values[sessArea] = user.Area
+	session.Values[sessJobName] = user.JobName
+	session.Values[sessDivision] = user.DivName
+	session.Values[sessInsitution] = user.DepName
+	session.Values[sessPosition] = user.Position
+	session.Values[sessLvl] = user.Level
+	session.Values[sessUID] = user.User
 	session.Values[sessLoginStatus] = 1
 
 	if err := session.Save(c.Request, c.Writer); err != nil {
@@ -162,18 +166,19 @@ func HandleLogin(c *gin.Context) {
 	// 8. Return success response
 	// "status"+"redirect" are used by login.html JS; legacy fields kept for API compat.
 	c.JSON(http.StatusOK, gin.H{
-		"status":      "success",
-		"result":      "Found",
-		"name":        fullName,
-		"uid":         user.User,
-		"position":    user.Position,
-		"level":       user.Level,
-		"job_name":    user.JobName,
-		"division":    user.DivName,
-		"insitution":  user.DepName,
-		"permission":  perm.Permission,
-		"redirect":    basePath + "/",
-		"link":        basePath + "/",
+		"status":        "success",
+		"result":        "Found",
+		"name":          fullName,
+		"uid":           user.User,
+		"position":      user.Position,
+		"level":         user.Level,
+		"job_name":      user.JobName,
+		"division":      user.DivName,
+		"insitution":    user.DepName,
+		"permission":    perm.Permission,
+		"download_tier": perm.DownloadTier,
+		"redirect":      basePath + "/",
+		"link":          basePath + "/",
 	})
 }
 
@@ -226,12 +231,73 @@ func AuthRequired(basePath string) gin.HandlerFunc {
 			return
 		}
 
-		// Expose session values to downstream handlers if needed
+		// Expose session values to downstream handlers if needed.
+		//
+		// Fallback note: sessions created before this deploy won't have
+		// permission_leak/download_tier set at all — default them to the
+		// narrowest/safest values ("branch"/"basic") rather than letting
+		// downstream handlers see an empty string.
+		permLeak, _ := session.Values[sessPermLeak].(string)
+		if permLeak == "" {
+			permLeak = services.ScopeBranch
+		}
+		downloadTier, _ := session.Values[sessDownloadTier].(string)
+		if downloadTier == "" {
+			downloadTier = services.TierBasic
+		}
+
 		c.Set("uid", session.Values[sessUID])
 		c.Set("uname", session.Values[sessUname])
 		c.Set("pwacode", session.Values[sessPwaCode])
 		c.Set("permission", permission)
-		c.Set("permission_leak", session.Values[sessPermLeak])
+		c.Set("permission_leak", permLeak)
+		c.Set("download_tier", downloadTier)
+
+		c.Next()
+	}
+}
+
+// ─── Download-tier gate (Requirement 1.2) ─────────────────────────────────────
+
+// DownloadTierOf reads download_tier from the gin context (set by
+// AuthRequired). Defaults to the most restrictive tier, "basic", if it was
+// never set — e.g. a handler wired without AuthRequired in front of it.
+func DownloadTierOf(c *gin.Context) string {
+	if v, ok := c.Get("download_tier"); ok {
+		if s, ok := v.(string); ok && s != "" {
+			return s
+		}
+	}
+	return services.TierBasic
+}
+
+// RequireFullDownload blocks requests that ask for an export format outside
+// xlsx/csv unless the user's download_tier is "full". It's for endpoints
+// whose format is passed as a query string parameter; handlers that receive
+// format in a JSON body (e.g. AdvancedQueryExport) must check
+// services.IsFormatAllowed directly instead.
+//
+// formatQueryKey is the query-string key holding the requested format
+// (e.g. "format"). defaultFormat is used when the query string omits it,
+// mirroring the handler's own default so the default format is never
+// blocked.
+func RequireFullDownload(formatQueryKey, defaultFormat string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		format := c.Query(formatQueryKey)
+		if format == "" {
+			format = defaultFormat
+		}
+
+		tier := DownloadTierOf(c)
+		if !services.IsFormatAllowed(tier, format) {
+			LogAuditEvent(c, "export_denied_"+format, "export", format)
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
+				"status":  "error",
+				"code":    "download_forbidden",
+				"message": "สิทธิ์ของคุณดาวน์โหลดได้เฉพาะไฟล์ Excel และ CSV เท่านั้น",
+			})
+			return
+		}
 
 		c.Next()
 	}

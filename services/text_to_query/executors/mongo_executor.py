@@ -185,6 +185,9 @@ LAYER_THAI = {
     "pwa_waterworks": "สำนักงาน",
     "struct": "รั้วบ้าน",
     "pipe_serv": "ท่อบริการ",
+    "dma_boundary": "ขอบเขต DMA",
+    "step_test": "จุดทดสอบ Step Test",
+    "flow_meter": "มาตรวัดอัตราการไหล",
 }
 
 LAYER_UNIT = {
@@ -197,6 +200,9 @@ LAYER_UNIT = {
     "pwa_waterworks": "แห่ง",
     "struct": "แห่ง",
     "pipe_serv": "ท่อ",
+    "dma_boundary": "พื้นที่",
+    "step_test": "จุด",
+    "flow_meter": "เครื่อง",
 }
 
 

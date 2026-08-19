@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"log"
+	"net/http"
 	"strings"
 	"time"
 
@@ -56,7 +57,7 @@ func AuditLogMiddleware() gin.HandlerFunc {
 		permLeak, _ := c.Get("permission_leak")
 
 		// Determine action from path
-		action := classifyAction(c.Request.Method, path, c.Query("format"))
+		action := classifyAction(c.Request.Method, path, c.Query("format"), c.Writer.Status())
 
 		// Determine target
 		targetType, targetValue := classifyTarget(c)
@@ -146,8 +147,23 @@ func insertAuditLog(
 }
 
 // classifyAction maps request paths to human-readable action names.
-func classifyAction(method, path, format string) string {
+// Requests denied by RequireFullDownload / the advanced-query-export tier
+// check (Requirement 1.2) come back with HTTP 403 — surface those as
+// "export_denied[_format]" so audit log readers can tell a blocked download
+// attempt apart from a successful one, without having to cross-reference the
+// explicit LogAuditEvent("export_denied_...") entry.
+func classifyAction(method, path, format string, status int) string {
 	// Export endpoints
+	isExportPath := strings.Contains(path, "/export/geodata") ||
+		strings.Contains(path, "/features/advanced-query/export")
+
+	if isExportPath && status == http.StatusForbidden {
+		if format != "" {
+			return "export_denied_" + format
+		}
+		return "export_denied"
+	}
+
 	if strings.Contains(path, "/export/geodata") {
 		switch format {
 		case "geojson":
@@ -168,6 +184,15 @@ func classifyAction(method, path, format string) string {
 	}
 	if strings.Contains(path, "/export/excel") {
 		return "export_excel"
+	}
+	if strings.Contains(path, "/features/advanced-query/export") {
+		// Format arrives in the JSON body here, not the query string, so it's
+		// usually empty at this point — the handler's own LogAuditEvent call
+		// records the concrete format.
+		if format == "" {
+			return "export_query"
+		}
+		return "export_" + format + "_query"
 	}
 
 	// View endpoints

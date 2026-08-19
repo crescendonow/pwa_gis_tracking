@@ -88,7 +88,11 @@ def _get_context(pwa_code):
 
 
 # ── Post-validation ──────────────────────────────────
-_VALID_LAYERS = {"pipe", "valve", "firehydrant", "meter", "bldg", "leakpoint", "pwa_waterworks", "dma_boundary"}
+_VALID_LAYERS = {
+    "pipe", "valve", "firehydrant", "meter", "bldg", "leakpoint",
+    "pwa_waterworks", "struct", "pipe_serv", "dma_boundary", "step_test",
+    "flow_meter",
+}
 
 
 def _sanitize_intent(intent):

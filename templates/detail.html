@@ -699,13 +699,22 @@
                 <div class="flex items-center gap-3 mb-4">
                   <label class="filter-label">รูปแบบ</label>
                   <select id="exportFormat" class="flex-1">
-                    <option value="geojson">GeoJSON (.geojson)</option>
-                    <option value="gpkg">GeoPackage (.gpkg)</option>
-                    <option value="shp">Shape File (.shp)</option>
-                    <option value="fgb">FlatGeobuf (.fgb)</option>
-                    <option value="tab">MapInfo TAB (.tab)</option>
-                    <option value="pmtiles">PMTiles (.pmtiles)</option>
+                    <option value="geojson" data-tier="full">GeoJSON (.geojson)</option>
+                    <option value="gpkg" data-tier="full">GeoPackage (.gpkg)</option>
+                    <option value="shp" data-tier="full">Shape File (.shp)</option>
+                    <option value="fgb" data-tier="full">FlatGeobuf (.fgb)</option>
+                    <option value="tab" data-tier="full">MapInfo TAB (.tab)</option>
+                    <option value="pmtiles" data-tier="full">PMTiles (.pmtiles)</option>
                   </select>
+                </div>
+                <div
+                  id="exportTierNotice"
+                  class="text-sm mb-3"
+                  style="display:none; color: var(--warning, #f59e0b);"
+                >
+                  <i class="fa-solid fa-circle-info"></i>
+                  สิทธิ์ของคุณดาวน์โหลดได้เฉพาะไฟล์ Excel และ CSV เท่านั้น
+                  กรุณาใช้เมนู Export Excel แทน
                 </div>
                 <!-- Merge/Split mode (visible when multi-branch or multi-layer) -->
                 <div id="exportMergeContainer" class="flex items-center gap-3 mb-4" style="display:none">
