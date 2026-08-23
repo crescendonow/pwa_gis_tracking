@@ -5,3 +5,4 @@
 /services/text_to_query/.env.example
 /.claude
 /.vscode
+/deployment/map-services.env

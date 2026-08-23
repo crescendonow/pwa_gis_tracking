@@ -249,6 +249,7 @@ func AuthRequired(basePath string) gin.HandlerFunc {
 		c.Set("uid", session.Values[sessUID])
 		c.Set("uname", session.Values[sessUname])
 		c.Set("pwacode", session.Values[sessPwaCode])
+		c.Set("area", session.Values[sessArea])
 		c.Set("permission", permission)
 		c.Set("permission_leak", permLeak)
 		c.Set("download_tier", downloadTier)

@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PWA GIS Online Tracking - แผนที่</title>
+  <link rel="icon" type="image/jpeg" href="/pwa_gis_tracking/static/images/pwa-logo.jpg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet">
+  <link rel="stylesheet" href="/pwa_gis_tracking/static/css/map.css">
+</head>
+<body>
+  <header class="map-header">
+    <a class="map-brand" href="/pwa_gis_tracking/">
+      <img src="/pwa_gis_tracking/static/images/pwa-logo.jpg" alt="ตราสัญลักษณ์ PWA">
+      <span><strong>PWA GIS Online Tracking</strong><small>แผนที่ภาพรวม</small></span>
+    </a>
+    <nav aria-label="เมนูหลัก">
+      <a href="/pwa_gis_tracking/">ภาพรวม</a>
+      <a href="/pwa_gis_tracking/detail">รายละเอียด</a>
+      <a class="active" href="/pwa_gis_tracking/map" aria-current="page">แผนที่</a>
+      <a href="/pwa_gis_tracking/logout">ออกจากระบบ</a>
+    </nav>
+  </header>
+
+  <main class="map-shell">
+    <aside id="mapSidebar" class="map-sidebar" aria-label="เครื่องมือแผนที่">
+      <div class="sidebar-heading">
+        <div><strong>สำรวจข้อมูล GIS</strong><small id="mapScopeLabel">กำลังตรวจสอบสิทธิ์…</small></div>
+        <button id="sidebarClose" class="icon-button" type="button" aria-label="ย่อแถบเครื่องมือ">‹</button>
+      </div>
+
+      <div class="sidebar-scroll">
+        <section class="tool-section" aria-labelledby="quickSearchTitle">
+          <h2 id="quickSearchTitle">ค้นหาด่วน</h2>
+          <div class="search-row">
+            <input id="quickSearch" type="search" placeholder="ชื่อ/รหัสสาขา หรือ lat, lon" autocomplete="off">
+            <button id="quickSearchButton" type="button">ค้นหา</button>
+          </div>
+          <div id="searchMessage" class="inline-message" aria-live="polite"></div>
+        </section>
+
+        <section class="tool-section" aria-labelledby="filterTitle">
+          <div class="section-title"><h2 id="filterTitle">ตัวกรอง</h2><button id="clearFilters" class="text-button" type="button">ล้างค่า</button></div>
+          <div class="field-grid">
+            <label>เขต<select id="mapZone"><option value="">ทุกเขตที่ได้รับสิทธิ์</option></select></label>
+            <label>สาขา<select id="mapBranch"><option value="">ทุกสาขาที่ได้รับสิทธิ์</option></select></label>
+            <label>วันที่เริ่ม<input id="mapStartDate" type="date"></label>
+            <label>วันที่สิ้นสุด<input id="mapEndDate" type="date"></label>
+          </div>
+          <button id="applyFilters" class="primary-button" type="button">ใช้ตัวกรอง</button>
+        </section>
+
+        <section class="tool-section" aria-labelledby="baseTitle">
+          <h2 id="baseTitle">แผนที่ฐาน</h2>
+          <label class="choice"><input type="radio" name="basemap" value="osm" checked> OSM</label>
+          <label class="choice"><input type="radio" name="basemap" value="satellite"> <span id="satelliteName">Esri World Imagery + ชื่อสถานที่ OSM</span></label>
+        </section>
+
+        <section class="tool-section" aria-labelledby="layerTitle">
+          <div class="section-title"><h2 id="layerTitle">ชั้นข้อมูลโครงการ</h2><span id="mapFeatureTotal" class="count-badge">–</span></div>
+          <div id="projectLayers" class="layer-list"></div>
+          <p class="section-note">ข้อมูลแสดงแบบ progressive ตามระดับซูม โดยมาตรวัดน้ำเริ่มที่ zoom 14</p>
+        </section>
+
+        <section class="tool-section" aria-labelledby="threeDTitle">
+          <h2 id="threeDTitle">แผนที่ 3 มิติ</h2>
+          <label class="choice"><input id="terrainToggle" type="checkbox"> ภูมิประเทศ DTM</label>
+          <label class="choice"><input id="buildingToggle" type="checkbox" checked> อาคาร OSM 3D (zoom 14+)</label>
+        </section>
+
+        <section class="tool-section ai-section" aria-labelledby="aiTitle">
+          <div class="ai-title"><span aria-hidden="true">💧</span><div><h2 id="aiTitle">น้องหนึ่งน้ำ</h2><small>ผู้ช่วยค้นหาข้อมูล GIS</small></div></div>
+          <div id="aiMessages" class="ai-messages" aria-live="polite"><p>ถามข้อมูลที่ต้องการดูบนแผนที่ได้เลยค่ะ</p></div>
+          <form id="aiForm">
+            <textarea id="aiPrompt" maxlength="500" rows="2" placeholder="เช่น แสดงท่อประปาของสาขานี้"></textarea>
+            <button type="submit">ส่งคำถาม</button>
+          </form>
+        </section>
+
+        <section class="map-meta" aria-label="แหล่งข้อมูลและสถานะ">
+          <span id="mapStatus" class="status-dot">กำลังเริ่มต้นแผนที่…</span>
+          <p>แผนที่: © OpenStreetMap contributors, OpenFreeMap / Esri World Imagery</p>
+        </section>
+      </div>
+    </aside>
+
+    <button id="sidebarOpen" class="sidebar-open" type="button" aria-label="เปิดแถบเครื่องมือ">เครื่องมือ</button>
+    <div id="overviewMap" role="application" aria-label="แผนที่ข้อมูล GIS ของการประปาส่วนภูมิภาค"></div>
+    <div class="zoom-readout" id="zoomReadout">Zoom –</div>
+  </main>
+
+  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+  <script src="/pwa_gis_tracking/static/js/map.js"></script>
+</body>
+</html>

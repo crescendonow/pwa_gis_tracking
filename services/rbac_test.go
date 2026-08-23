@@ -133,3 +133,18 @@ func TestEmployee10432AlwaysHasFullDownload(t *testing.T) {
 		t.Fatalf("DownloadTier = %q, want %q", got.DownloadTier, TierFull)
 	}
 }
+
+func TestMapScopeOverrideDoesNotWidenOtherPermissions(t *testing.T) {
+	const userID = "map-test-user"
+	mapScopeOverrides[userID] = ScopeAll
+	t.Cleanup(func() { delete(mapScopeOverrides, userID) })
+
+	input := PermissionInput{UserID: userID}
+	permission := ResolvePermission(input)
+	if permission.PermissionLeak != ScopeBranch || permission.DownloadTier != TierBasic {
+		t.Fatalf("ordinary permission changed: %#v", permission)
+	}
+	if got := ResolveMapScope(input); got != ScopeAll {
+		t.Fatalf("map scope = %q, want %q", got, ScopeAll)
+	}
+}

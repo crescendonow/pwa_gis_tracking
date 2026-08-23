@@ -189,3 +189,16 @@ func TestDashboardHtmlRedirectRequiresAuth(t *testing.T) {
 		t.Fatalf("Location = %q, want %q", location, basePath+"/")
 	}
 }
+
+func TestMapPageRequiresAuthentication(t *testing.T) {
+	router := setupTestRouter(t)
+
+	rr := performRequest(router, http.MethodGet, basePath+"/map")
+
+	if rr.Code != http.StatusFound {
+		t.Fatalf("status code = %d, want %d", rr.Code, http.StatusFound)
+	}
+	if location := rr.Header().Get("Location"); location != basePath+"/login" {
+		t.Fatalf("Location = %q, want %q", location, basePath+"/login")
+	}
+}

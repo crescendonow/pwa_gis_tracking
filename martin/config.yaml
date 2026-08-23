@@ -1,0 +1,12 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/maplibre/martin/main/schemas/config.json
+# Keep Martin private. Browser requests must go through the authenticated Go tile proxy.
+listen_addresses: "127.0.0.1:5031"
+cache_size_mb: 256
+postgres:
+  connection_string: ${DATABASE_URL}
+  pool_size: 8
+  auto_publish: false
+  functions:
+    pwa_gis_map_tile:
+      schema: pwa_tracking_map
+      function: pwa_gis_map_tile

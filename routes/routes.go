@@ -43,6 +43,9 @@ func RegisterRoutes(router *gin.Engine) {
 		base.GET("/detail", func(c *gin.Context) {
 			c.HTML(200, "detail.html", nil)
 		})
+		base.GET("/map", func(c *gin.Context) {
+			c.HTML(200, "map.html", nil)
+		})
 
 		// REST API endpoints
 		api := base.Group("/api", handlers.AuditLogMiddleware())
@@ -81,7 +84,14 @@ func RegisterRoutes(router *gin.Engine) {
 
 			// Chatbot — text-to-query (proxy to Python service)
 			api.POST("/chatbot/query", handlers.ChatbotQuery)
+
+			api.GET("/map/config", handlers.GetMapConfig)
+			api.GET("/map/summary", handlers.GetMapSummary)
 		}
+
+		// Tile requests are high-frequency and remain authenticated, but bypass
+		// per-request audit inserts to avoid one database write for every map tile.
+		base.GET("/api/map/tiles/:layer/:z/:x/:y", handlers.GetMapTile)
 
 		// Health check
 		base.GET("/health", func(c *gin.Context) {

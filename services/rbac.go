@@ -92,6 +92,10 @@ var explicitUserIDs = map[string]string{
 	"6026":  "branch",
 }
 
+// mapScopeOverrides are deliberately separate from explicitUserIDs. They
+// allow a map-only exception without widening detail or download access.
+var mapScopeOverrides = map[string]string{}
+
 // fullDownloadUserIDs are employee-specific exceptions that may download
 // every supported format, independent of their data-visibility scope.
 var fullDownloadUserIDs = map[string]bool{
@@ -218,6 +222,26 @@ func ResolvePermission(u PermissionInput) Permission {
 		PermissionLeak: scope,
 		DownloadTier:   tier,
 	}
+}
+
+// ResolveMapScope resolves the scope used only by overview-map requests.
+func ResolveMapScope(u PermissionInput) string {
+	return MapScopeForUser(u.UserID, ResolvePermission(u).PermissionLeak)
+}
+
+// MapScopeForUser applies a map-only exception to an existing session scope.
+func MapScopeForUser(userID, fallback string) string {
+	if scope, ok := mapScopeOverrides[userID]; ok && isValidScope(scope) {
+		return scope
+	}
+	if isValidScope(fallback) {
+		return fallback
+	}
+	return ScopeBranch
+}
+
+func isValidScope(scope string) bool {
+	return scope == ScopeAll || scope == ScopeRegion || scope == ScopeBranch
 }
 
 // resolveScope determines the data-visibility scope from the existing
