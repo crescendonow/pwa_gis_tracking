@@ -408,6 +408,7 @@ async function loadSingleBranchDetail(pwaCode) {
         if (data.status === 'success') {
             currentBranchData = data;
             document.getElementById('resultsSection').style.display = 'block';
+            document.getElementById('resultsSection').classList.remove('chatbot-map-only');
             document.getElementById('emptyState').style.display = 'none';
             renderDetailStats(data);
             renderDetailChart(data);
@@ -443,6 +444,7 @@ async function loadMultiBranchSummary() {
         }
         // Display multi-branch summary
         document.getElementById('resultsSection').style.display = 'block';
+        document.getElementById('resultsSection').classList.remove('chatbot-map-only');
         document.getElementById('emptyState').style.display = 'none';
         renderMultiBranchTable(results);
         populateExportLayers();

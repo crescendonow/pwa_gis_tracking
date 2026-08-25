@@ -17,10 +17,10 @@ log = logging.getLogger("text_to_query")
 # ── Service ──────────────────────────────────────────
 PORT = int(os.getenv("PORT", "5022"))
 
-# ── LLM (Gemini Flash) ──────────────────────────────
+# ── LLM (OpenRouter / Qwen3-Coder) ───────────────────
 LLM_TIMEOUT = int(os.getenv("LLM_TIMEOUT", "30"))
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
+OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "qwen/qwen3-coder")
 
 # ── PostgreSQL (PostGIS) ─────────────────────────────
 PG_HOST = os.getenv("PG_HOST", "192.168.242.38")
@@ -66,3 +66,7 @@ CACHE_MAX_ENTRIES = int(os.getenv("CACHE_MAX_ENTRIES", "10000"))
 
 # ── Rate Limit ───────────────────────────────────────
 RATE_LIMIT = os.getenv("RATE_LIMIT", "10/minute")
+
+# ── Query result caps ─────────────────────────────────
+# จำนวน feature สูงสุดต่อ 1 คำถามแบบแสดงตำแหน่ง (0 = ไม่จำกัด)
+MAX_GEOJSON_FEATURES = int(os.getenv("MAX_GEOJSON_FEATURES", "50000"))

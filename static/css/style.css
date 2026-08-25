@@ -94,7 +94,10 @@ body::before {
 .nav-brand .logo-icon {
     width: 40px;
     height: 40px;
-    background: linear-gradient(135deg, #FFFFFF, #EBF3FA);
+    /* สีเดียวกับพื้นหลังโลโก้ (#007CC2) — กันขอบขาวโผล่ที่มุมโค้ง
+       และ overflow:hidden ใช้ครอบภาพที่ scale เกินกรอบ (ตัดขอบขาวที่ติดมากับไฟล์ .jpg) */
+    background: #007CC2;
+    overflow: hidden;
     border-radius: 10px;
     display: flex;
     align-items: center;

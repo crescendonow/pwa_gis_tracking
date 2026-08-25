@@ -19,7 +19,7 @@ class PipeTotalLengthPattern:
         if ctx.year_range:
             extra["properties.yearInstall"] = ctx.year_range
         if ctx.exclude_sleeve:
-            extra["properties.functionId"] = {"$ne": "6"}
+            extra["properties.functionId"] = {"$ne": 6}
 
         match_stage = build_match(
             ctx.effective_pwa, ctx.pipe_type, ctx.pipe_func_id,

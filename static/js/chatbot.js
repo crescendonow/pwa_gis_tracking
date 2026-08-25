@@ -8,6 +8,7 @@ var chatbotOpen = false;
 var chatbotBusy = false;
 var chatMsgIdCounter = 0;
 var _chatbotPendingGeoJSON = null;
+var _chatbotLastPrompt = '';
 
 /* ─── Toggle ─────────────────────────────── */
 function toggleChatbot() {
@@ -27,15 +28,22 @@ function toggleChatbot() {
 }
 
 /* ─── Send Message ───────────────────────── */
-async function sendChatMessage() {
+// promptOverride: ถ้าไม่ระบุ จะอ่านจาก #chatInput เอง (การพิมพ์ถามปกติ)
+// forceLLM: true = ข้าม rule parser แล้วให้ LLM ตอบโดยตรง (ปุ่ม "ถามใหม่ด้วย AI")
+async function sendChatMessage(promptOverride, forceLLM) {
     if (chatbotBusy) return;
     var input = document.getElementById('chatInput');
-    var prompt = (input.value || '').trim();
-    if (!prompt) return;
-    input.value = '';
-
-    // Show user message
-    appendChatMsg('user', escapeHtmlChat(prompt));
+    var prompt;
+    if (typeof promptOverride === 'string' && promptOverride) {
+        prompt = promptOverride;
+    } else {
+        prompt = (input.value || '').trim();
+        if (!prompt) return;
+        input.value = '';
+        // Show user message
+        appendChatMsg('user', escapeHtmlChat(prompt));
+    }
+    _chatbotLastPrompt = prompt;
 
     // Determine pwa_code from current page context
     var pwaCode = '';
@@ -55,7 +63,7 @@ async function sendChatMessage() {
         var res = await fetch('/pwa_gis_tracking/api/chatbot/query', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prompt: prompt, pwa_code: pwaCode })
+            body: JSON.stringify({ prompt: prompt, pwa_code: pwaCode, force_llm: !!forceLLM })
         });
 
         removeTypingIndicator(typingId);
@@ -122,20 +130,20 @@ function renderChatbotResponse(data) {
     }
 
     if (data.response_type === 'geojson') {
-        // GeoJSON FeatureCollection
+        // GeoJSON FeatureCollection — แสดงบนแผนที่เสมอ แม้ผู้ใช้ยังไม่เคยกด "ค้นหา"/เปิด Layer มาก่อน
         var features = result.features || [];
         if (features.length === 0) {
             appendChatMsg('bot', 'ไม่พบข้อมูลตำแหน่งที่ตรงตามเงื่อนไขค่ะ');
-            return;
-        }
-
-        // Check if map is available (detail page with layer loaded)
-        var mapAvailable = (typeof detailMap !== 'undefined' && detailMap) ||
-                           (document.getElementById('detailMapContainer') && typeof ensureMap === 'function');
-
-        if (mapAvailable) {
-            appendChatMsg('bot',
-                'พบข้อมูล <strong>' + features.length.toLocaleString('th-TH') + '</strong> รายการค่ะ ' +
+        } else {
+            var totalCount = (typeof result.total_count === 'number') ? result.total_count : features.length;
+            var countMsg;
+            if (result.truncated) {
+                countMsg = 'พบข้อมูล <strong>' + totalCount.toLocaleString('th-TH') + '</strong> รายการ ' +
+                    '(แสดง <strong>' + features.length.toLocaleString('th-TH') + '</strong> รายการแรกบนแผนที่) ค่ะ ';
+            } else {
+                countMsg = 'พบข้อมูล <strong>' + totalCount.toLocaleString('th-TH') + '</strong> รายการค่ะ ';
+            }
+            appendChatMsg('bot', countMsg +
                 '<span class="chat-map-link" onclick="scrollToMap()"><i class="fa-solid fa-map-location-dot"></i> ดูบนแผนที่</span>'
             );
             try {
@@ -149,13 +157,6 @@ function renderChatbotResponse(data) {
                     'ไม่สามารถแสดงแผนที่ได้ในขณะนี้ กรุณากด "ดูบนแผนที่" อีกครั้งค่ะ</span>'
                 );
             }
-        } else {
-            appendChatMsg('bot',
-                'พบข้อมูล <strong>' + features.length.toLocaleString('th-TH') + '</strong> รายการค่ะ<br>' +
-                '<span style="color:var(--text-muted);font-size:12px;">' +
-                '<i class="fa-solid fa-circle-info" style="margin-right:4px;"></i>' +
-                'กรุณาเปิดหน้า "รายละเอียด" และเลือก Layer ก่อน เพื่อแสดงตำแหน่งบนแผนที่</span>'
-            );
         }
 
     } else if (data.response_type === 'numeric') {
@@ -184,6 +185,11 @@ function renderChatbotResponse(data) {
         else if (meta.model) metaParts.push('LLM');
         if (metaParts.length > 0) {
             appendChatMeta(metaParts.join(' · '));
+        }
+
+        // คำตอบมาจาก rule parser และน่าจะลองถาม LLM เพิ่มได้ → แสดงปุ่ม "ถามใหม่ด้วย AI"
+        if (meta.can_retry_llm) {
+            appendRetryLLM();
         }
     }
 }
@@ -218,6 +224,29 @@ function appendQueryBlock(label, code) {
         '</div>';
     container.appendChild(div);
     container.scrollTop = container.scrollHeight;
+}
+
+function appendRetryLLM() {
+    var container = document.getElementById('chatMessages');
+    var div = document.createElement('div');
+    div.className = 'chat-msg bot';
+    div.innerHTML =
+        '<div class="chat-bubble" style="padding:8px 12px">' +
+            '<div style="font-size:12px;color:var(--text-muted);margin-bottom:6px">' +
+                'คำตอบนี้มาจากกฎอัตโนมัติ ถ้ายังไม่ตรงกับที่ต้องการ ลองให้ AI ช่วยวิเคราะห์อีกครั้งค่ะ' +
+            '</div>' +
+            '<button class="chat-retry-llm" onclick="retryWithLLM()">' +
+                '<i class="fa-solid fa-wand-magic-sparkles"></i> ถามใหม่ด้วย AI' +
+            '</button>' +
+        '</div>';
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
+}
+
+function retryWithLLM() {
+    if (!_chatbotLastPrompt || chatbotBusy) return;
+    appendChatMsg('user', escapeHtmlChat('🤖 ' + _chatbotLastPrompt + ' (ถามด้วย AI)'));
+    sendChatMessage(_chatbotLastPrompt, true);
 }
 
 function renderChatNumeric(result) {
@@ -294,39 +323,51 @@ function escapeHtmlChat(str) {
 
 /* ─── Map Integration ────────────────────── */
 
-function renderChatbotGeoJSON(geojson) {
-    // Ensure map exists and is visible
-    var mapContainer = document.getElementById('detailMapContainer');
-    if (mapContainer) mapContainer.style.display = 'block';
+/**
+ * เปิดแผนที่ให้มองเห็นได้เสมอ แม้ผู้ใช้จะยังไม่เคยกด "ค้นหา"/เปิด Layer มาก่อน
+ * #detailMapContainer เป็นลูกของ #resultsSection ซึ่งซ่อนอยู่ (display:none) จนกว่าจะค้นหาจริง
+ * ฟังก์ชันนี้เปิดทั้งพ่อและลูก แล้ว resize() แผนที่ (ที่อาจถูกสร้างไว้ตั้งแต่ container ยังซ่อนอยู่
+ * ทำให้ canvas มีขนาด 0) ให้ตรงกับขนาดจริงก่อนแสดงผล — ถ้ายังไม่เคยค้นหาจริง จะโชว์เฉพาะการ์ดแผนที่
+ * (ซ่อนการ์ดสถิติ/กราฟ/ตาราง/export ที่ยังว่างอยู่ ด้วย class 'chatbot-map-only')
+ */
+function _ensureChatbotMapVisible() {
+    var results = document.getElementById('resultsSection');
+    var empty = document.getElementById('emptyState');
+    var mapBox = document.getElementById('detailMapContainer');
+    if (!results || !mapBox) return null;
 
-    // Wait for map if not yet initialized
-    if (typeof detailMap === 'undefined' || !detailMap) {
-        // Try to use existing ensureMap function from detail.js
-        if (typeof ensureMap === 'function') {
-            ensureMap();
-        }
-        // If map still not available, try again after a short delay
-        if (!detailMap) {
-            setTimeout(function() {
-                if (typeof detailMap !== 'undefined' && detailMap) {
-                    _addChatbotLayer(geojson);
-                } else {
-                    appendChatMsg('bot',
-                        '<span style="color:var(--text-muted);font-size:12px;">' +
-                        '<i class="fa-solid fa-circle-info" style="margin-right:4px;"></i>' +
-                        'กรุณาเลือก Layer เพื่อเปิดแผนที่ก่อน จากนั้นลองถามคำถามอีกครั้งค่ะ</span>'
-                    );
-                }
-            }, 800);
-            return;
-        }
+    var hasRealSearch = (typeof mapLoadedSources !== 'undefined' && mapLoadedSources.length > 0);
+    if (!hasRealSearch) results.classList.add('chatbot-map-only');
+
+    results.style.display = 'block';
+    if (empty) empty.style.display = 'none';
+    mapBox.style.display = 'block';
+
+    var map = (typeof ensureMap === 'function') ? ensureMap() : null;
+    if (map) {
+        // Resize ทันที (synchronous) — ต้องทำก่อนเพิ่ม layer/fitBounds ไม่งั้นจะคำนวณจาก canvas ขนาด 0
+        try { map.resize(); } catch (e) {}
+        // เผื่อ layout ยังไม่นิ่ง (เช่น font/CSS transition ของการ์ดที่เพิ่งโผล่) — resize ซ้ำอีกครั้งหลัง 60ms
+        setTimeout(function () { try { map.resize(); } catch (e) {} }, 60);
     }
-
-    _addChatbotLayer(geojson);
+    return map;
 }
 
-function _addChatbotLayer(geojson) {
-    var map = (typeof detailMap !== 'undefined') ? detailMap : null;
+function renderChatbotGeoJSON(geojson) {
+    var map = _ensureChatbotMapVisible();
+    if (!map) {
+        appendChatMsg('bot',
+            '<span style="color:var(--text-muted);font-size:12px;">' +
+            '<i class="fa-solid fa-circle-info" style="margin-right:4px;"></i>' +
+            'ไม่สามารถเปิดแผนที่ได้ในขณะนี้ค่ะ กรุณาลองใหม่อีกครั้ง</span>'
+        );
+        return;
+    }
+    _addChatbotLayer(geojson, map);
+}
+
+function _addChatbotLayer(geojson, map) {
+    map = map || ((typeof detailMap !== 'undefined') ? detailMap : null);
     if (!map) return;
 
     function _doAdd() {
@@ -456,11 +497,11 @@ function _extendBoundsRecursive(bounds, coords) {
 }
 
 function scrollToMap() {
+    // เผื่อผู้ใช้กด "ดูบนแผนที่" ก่อนที่แผนที่จะทันเปิด (เช่น renderChatbotGeoJSON ก่อนหน้าล้มเหลว)
+    _ensureChatbotMapVisible();
     var mapEl = document.getElementById('detailMapContainer');
-    if (mapEl) {
-        mapEl.style.display = 'block';
-        mapEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
+    if (mapEl) mapEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
     // Retry pending GeoJSON that failed to render earlier
     if (_chatbotPendingGeoJSON) {
         var pending = _chatbotPendingGeoJSON;

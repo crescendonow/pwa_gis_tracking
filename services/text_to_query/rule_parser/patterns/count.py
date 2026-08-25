@@ -3,6 +3,9 @@
 from datetime import datetime
 
 from ..query_builder import build_match
+from ..daterange import year_range, month_range
+from ..mappings.fields import date_field
+from ..mappings.meter import cust_stat_filter
 
 
 class CountMeterStatusPattern:
@@ -15,7 +18,7 @@ class CountMeterStatusPattern:
         filt = {}
         if ctx.effective_pwa:
             filt["properties.pwaCode"] = ctx.effective_pwa
-        filt["properties.custStat"] = ctx.meter_stat_id
+        filt["properties.custStat"] = cust_stat_filter(ctx.meter_stat_id)
 
         return {
             "text_response": "กำลังนับจำนวนมาตรวัดน้ำ สถานะ{}ค่ะ".format(ctx.meter_stat_label),
@@ -48,7 +51,7 @@ class CountWithFilterPattern:
         if ctx.year_range and ctx.layer == "pipe":
             extra["properties.yearInstall"] = ctx.year_range
         if ctx.exclude_sleeve and ctx.layer == "pipe":
-            extra["properties.functionId"] = {"$ne": "6"}
+            extra["properties.functionId"] = {"$ne": 6}
 
         match_stage = build_match(
             ctx.effective_pwa,
@@ -98,7 +101,7 @@ class CountWithAgePattern:
             cutoff_year = datetime.now().year + 543 - ctx.age
             extra["properties.yearInstall"] = {"$lte": cutoff_year}
         elif ctx.layer == "meter":
-            cutoff_date = "{}-01-01T00:00:00Z".format(datetime.now().year - ctx.age)
+            cutoff_date = datetime(datetime.now().year - ctx.age, 1, 1)
             extra["properties.beginCustDate"] = {"$lte": cutoff_date}
 
         match_stage = build_match(ctx.effective_pwa, extra=extra, layer=ctx.layer)
@@ -130,8 +133,8 @@ class CountFiscalYearPattern:
         filt = {}
         if ctx.effective_pwa:
             filt["properties.pwaCode"] = ctx.effective_pwa
-        date_field = "properties.leakDatetime" if ctx.layer == "leakpoint" else "properties.recordDate"
-        filt[date_field] = {"$gte": ctx.fiscal_start, "$lt": ctx.fiscal_end}
+        dfield = date_field(ctx.layer)
+        filt[dfield] = {"$gte": ctx.fiscal_start, "$lt": ctx.fiscal_end}
 
         return {
             "text_response": "กำลังนับจำนวน{} ปีงบประมาณ {} ค่ะ".format(ctx.layer_label, ctx.fiscal_year),
@@ -161,31 +164,21 @@ class CountWithDatePattern:
         if ctx.effective_pwa:
             filt["properties.pwaCode"] = ctx.effective_pwa
 
-        date_field = "properties.leakDatetime" if ctx.layer == "leakpoint" else "properties.recordDate"
+        dfield = date_field(ctx.layer)
 
         date_desc = ""
         if ctx.year and ctx.month:
-            start = "{}-{:02d}-01T00:00:00Z".format(ctx.year, ctx.month)
-            if ctx.month == 12:
-                end = "{}-01-01T00:00:00Z".format(ctx.year + 1)
-            else:
-                end = "{}-{:02d}-01T00:00:00Z".format(ctx.year, ctx.month + 1)
-            filt[date_field] = {"$gte": start, "$lt": end}
+            start, end = month_range(ctx.year, ctx.month)
+            filt[dfield] = {"$gte": start, "$lt": end}
             date_desc = "เดือน {}/{} ".format(ctx.month, ctx.year + 543)
         elif ctx.year:
-            filt[date_field] = {
-                "$gte": "{}-01-01T00:00:00Z".format(ctx.year),
-                "$lt": "{}-01-01T00:00:00Z".format(ctx.year + 1),
-            }
+            start, end = year_range(ctx.year)
+            filt[dfield] = {"$gte": start, "$lt": end}
             date_desc = "ปี {} ".format(ctx.year + 543)
         elif ctx.month:
             cy = datetime.now().year
-            start = "{}-{:02d}-01T00:00:00Z".format(cy, ctx.month)
-            if ctx.month == 12:
-                end = "{}-01-01T00:00:00Z".format(cy + 1)
-            else:
-                end = "{}-{:02d}-01T00:00:00Z".format(cy, ctx.month + 1)
-            filt[date_field] = {"$gte": start, "$lt": end}
+            start, end = month_range(cy, ctx.month)
+            filt[dfield] = {"$gte": start, "$lt": end}
             date_desc = "เดือน {} ".format(ctx.month)
 
         return {

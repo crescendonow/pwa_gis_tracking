@@ -3,12 +3,14 @@ package mapsync
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 // MongoSource adapts the existing collections/features_{id} layout without
@@ -16,6 +18,10 @@ import (
 type MongoSource struct {
 	Client   *mongo.Client
 	Database string
+	// IncludeRollups keeps region-level (b{region}000_*) collections in the
+	// mirror. They are stale duplicates of branch collections, so this
+	// defaults to false and exists only as an operator escape hatch.
+	IncludeRollups bool
 }
 
 func (source MongoSource) Collections(ctx context.Context) ([]Collection, error) {
@@ -31,17 +37,37 @@ func (source MongoSource) Collections(ctx context.Context) ([]Collection, error)
 			return nil, err
 		}
 		collection, err := ParseCollectionAlias(fmt.Sprint(document["alias"]), mongoID(document["_id"]))
-		if err != nil || !IsSupportedLayer(collection.Layer) {
+		if err != nil {
 			continue
 		}
 		collections = append(collections, collection)
 	}
-	return collections, cursor.Err()
+	if err := cursor.Err(); err != nil {
+		return nil, err
+	}
+	return FilterCollections(collections, source.IncludeRollups), nil
 }
 
-func (source MongoSource) ForEach(ctx context.Context, collection Collection, since *time.Time, visit func(SourceFeature) error) error {
-	filter := incrementalMongoFilter(since)
-	cursor, err := source.Client.Database(source.Database).Collection("features_"+collection.ID).Find(ctx, filter)
+// FilterCollections applies the supported-layer allow-list and, unless
+// includeRollups is set, drops region-level rollup collections. It is a pure
+// function so the queue-shaping rules can be tested without a live Mongo.
+func FilterCollections(collections []Collection, includeRollups bool) []Collection {
+	filtered := make([]Collection, 0, len(collections))
+	for _, collection := range collections {
+		if !IsSupportedLayer(collection.Layer) {
+			continue
+		}
+		if !includeRollups && IsRollupPwaCode(collection.PwaCode) {
+			continue
+		}
+		filtered = append(filtered, collection)
+	}
+	return filtered
+}
+
+func (source MongoSource) ForEach(ctx context.Context, collection Collection, position Cursor, visit func(SourceFeature) error) error {
+	filter, findOptions := mongoFindArgs(collection, position)
+	cursor, err := source.Client.Database(source.Database).Collection("features_"+collection.ID).Find(ctx, filter, findOptions)
 	if err != nil {
 		return err
 	}
@@ -72,19 +98,40 @@ func (source MongoSource) ForEach(ctx context.Context, collection Collection, si
 	return cursor.Err()
 }
 
+// mongoFindArgs picks the filter and sort/batch options for one ForEach call.
+// Incremental reads use the properties._updatedAt_1 index that exists on
+// every collection. Full scans use the _id_ index so no in-memory sort is
+// needed and a mid-scan timeout can resume with $gt on the last seen _id.
+func mongoFindArgs(collection Collection, position Cursor) (bson.M, *options.FindOptions) {
+	if position.Since != nil {
+		findOptions := options.Find().SetSort(bson.D{{Key: "properties._updatedAt", Value: 1}, {Key: "_id", Value: 1}}).SetBatchSize(1000)
+		return incrementalMongoFilter(position.Since), findOptions
+	}
+	findOptions := options.Find().SetSort(bson.D{{Key: "_id", Value: 1}}).SetBatchSize(1000)
+	filter := bson.M{}
+	if afterID := strings.TrimSpace(position.AfterID); afterID != "" {
+		objectID, err := primitive.ObjectIDFromHex(afterID)
+		if err != nil {
+			log.Printf("map_sync_cursor_invalid collection=%s cursor=%q error=%v: restarting full scan from the beginning", collection.Alias, afterID, err)
+		} else {
+			filter = bson.M{"_id": bson.M{"$gt": objectID}}
+		}
+	}
+	return filter, findOptions
+}
+
+// incrementalMongoFilter matches on properties._updatedAt alone. Every feature
+// collection carries a properties._updatedAt_1 index and stores its timestamps
+// there; the top-level _updatedAt/updatedAt fields do not exist. An $or across
+// those unindexed fields made MongoDB fall back to a collection scan of all
+// 44M documents on every 15-minute cycle, and combined with the sort in
+// mongoFindArgs it would also force a 32MB in-memory sort. Documents with no
+// properties._updatedAt are picked up by the daily full reconciliation.
 func incrementalMongoFilter(since *time.Time) bson.M {
 	if since == nil {
 		return bson.M{}
 	}
-	replayFrom := since.UTC().Add(-IncrementalReplayOverlap)
-	newer := bson.M{"$gte": replayFrom}
-	return bson.M{"$or": []bson.M{
-		{"_updatedAt": newer}, {"updatedAt": newer},
-		{"properties._updatedAt": newer}, {"properties.updatedAt": newer},
-		{"_createdAt": newer}, {"createdAt": newer},
-		{"properties._createdAt": newer}, {"properties.createdAt": newer},
-		{"_id": bson.M{"$type": "objectId", "$gte": primitive.NewObjectIDFromTimestamp(replayFrom)}},
-	}}
+	return bson.M{"properties._updatedAt": bson.M{"$gte": since.UTC().Add(-IncrementalReplayOverlap)}}
 }
 
 func mongoObjectIDTime(value any) *time.Time {

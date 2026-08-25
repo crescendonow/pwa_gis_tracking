@@ -23,6 +23,7 @@ func main() {
 	// Establish database connections
 	config.ConnectPostgres()
 	config.ConnectMongoDB()
+	config.ConnectMapDatabase()
 
 	// Initialize gorilla/sessions cookie store (must be before routes)
 	config.InitSessionStore()
@@ -48,8 +49,8 @@ func main() {
 
 	// Background cache warmer every 15 minutes
 	ctx, cancel := context.WithCancel(context.Background())
-    defer cancel()
-    handlers.StartCacheWarmer(ctx)
+	defer cancel()
+	handlers.StartCacheWarmer(ctx)
 
 	// Register all routes
 	routes.RegisterRoutes(router)

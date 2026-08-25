@@ -3,6 +3,8 @@ package services
 import (
 	"errors"
 	"testing"
+
+	"pwa_gis_tracking/config"
 )
 
 func TestMapPwaCodesDerivesServerScope(t *testing.T) {
@@ -59,6 +61,16 @@ func TestNarrowMapPwaCodesCannotWidenScope(t *testing.T) {
 	}
 	if _, err := NarrowMapPwaCodes("*", "*"); err == nil {
 		t.Fatal("browser wildcard should be rejected")
+	}
+}
+
+func TestLoadMapSummaryUsesMapDatabaseAndFallsBackWhenUnavailable(t *testing.T) {
+	previousPg, previousMap := config.PgDB, config.MapDB
+	config.PgDB, config.MapDB = nil, nil
+	t.Cleanup(func() { config.PgDB, config.MapDB = previousPg, previousMap })
+
+	if _, _, err := LoadMapSummary(ScopeAll, "", "", nil); err == nil {
+		t.Fatal("expected an error when neither MapDB nor PgDB is configured")
 	}
 }
 

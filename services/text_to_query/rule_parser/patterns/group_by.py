@@ -4,6 +4,15 @@ import re
 from datetime import datetime
 
 from ..query_builder import build_match
+from ..mappings.fields import type_field, size_field, status_field
+from ..mappings.meter import cust_stat_filter
+
+LABEL_TYPE = {"pipe": "ชนิดท่อ", "valve": "ชนิดวาล์ว", "leakpoint": "ชนิดท่อ", "bldg": "ประเภทอาคาร"}
+LABEL_SIZE = {
+    "pipe": "ขนาด (มม.)", "valve": "ขนาด (มม.)", "firehydrant": "ขนาด (มม.)",
+    "leakpoint": "ขนาดท่อ (มม.)", "meter": "ขนาดมิเตอร์",
+}
+LABEL_STATUS = {"valve": "สถานะ", "firehydrant": "สถานะ", "meter": "สถานะลูกค้า", "bldg": "สถานะการใช้น้ำ"}
 
 
 class GroupByPattern:
@@ -19,7 +28,7 @@ class GroupByPattern:
 
         extra_match = {}
         if ctx.meter_stat_id and ctx.layer == "meter":
-            extra_match["properties.custStat"] = ctx.meter_stat_id
+            extra_match["properties.custStat"] = cust_stat_filter(ctx.meter_stat_id)
         if ctx.age and ctx.layer == "pipe":
             cutoff_year = datetime.now().year + 543 - ctx.age
             extra_match["properties.yearInstall"] = {"$lte": cutoff_year}
@@ -40,17 +49,19 @@ class GroupByPattern:
         group_stage = {"$group": {"_id": group_field, "จำนวน": {"$sum": 1}}}
         group_stage["$group"].update(extra_accum)
 
-        # Build $project stage
+        # Build $project stage — มิติ (ชนิด/ขนาด/ฯลฯ) มาก่อน แล้วค่อย "จำนวน" ต่อท้ายเสมอ
+        # เพื่อให้อ่านผลลัพธ์เป็นตารางง่าย (ชนิด | ขนาด | จำนวน)
         if isinstance(group_field, dict):
-            project = {"_id": 0, "จำนวน": "$จำนวน"}
-            for k in group_field:
+            project = {"_id": 0}
+            for k in group_field:                 # dict ใน Python 3.7+ รักษาลำดับ insertion
                 project[k] = "$_id.{}".format(k)
             if extra_accum:
                 project["ความยาวรวม"] = 1
+            project["จำนวน"] = "$จำนวน"           # ← ต่อท้ายเสมอ
             project_stage = {"$project": project}
         else:
             if extra_accum:
-                project_stage = {"$project": {"_id": 0, group_label: "$_id", "จำนวน": 1, "ความยาวรวม": 1}}
+                project_stage = {"$project": {"_id": 0, group_label: "$_id", "ความยาวรวม": 1, "จำนวน": 1}}
             else:
                 project_stage = {"$project": {"_id": 0, group_label: "$_id", "จำนวน": "$จำนวน"}}
 
@@ -93,38 +104,26 @@ class GroupByPattern:
             return "$properties.pwaCode", "สาขา"
 
         if has_type_in_grp and has_size_in_grp:
-            if layer == "pipe":
-                return {"ชนิดท่อ": "$properties.typeId", "ขนาด": "$properties.sizeId"}, "ชนิดท่อ+ขนาด"
-            elif layer == "leakpoint":
-                return {"ชนิดท่อ": "$properties.pipeTypeId", "ขนาดท่อ": "$properties.pipeSizesId"}, "ชนิดท่อ+ขนาดท่อ"
-            else:
-                return {"ชนิด": "$properties.typeId", "ขนาด": "$properties.sizeId"}, "ชนิด+ขนาด"
+            tf, sf = type_field(layer), size_field(layer)
+            if not (tf and sf):
+                return None, None
+            label_t = "ชนิดท่อ" if layer in ("pipe", "leakpoint") else "ชนิด"
+            label_s = "ขนาดท่อ" if layer == "leakpoint" else "ขนาด"
+            return {label_t: "$" + tf, label_s: "$" + sf}, label_t + "+" + label_s
 
         if has_type_in_grp:
-            if layer == "pipe":
-                return "$properties.typeId", "ชนิดท่อ"
-            elif layer == "valve":
-                return "$properties.typeId", "ชนิดวาล์ว"
-            elif layer == "leakpoint":
-                return "$properties.pipeTypeId", "ชนิดท่อ"
+            tf = type_field(layer)
+            return ("$" + tf, LABEL_TYPE.get(layer, "ชนิด")) if tf else (None, None)
 
         if has_size_in_grp:
-            if layer == "pipe":
-                return "$properties.sizeId", "ขนาด (มม.)"
-            elif layer == "meter":
-                return "$properties.meterSizeCode", "ขนาดมิเตอร์"
-            elif layer in ("valve", "firehydrant"):
-                return "$properties.sizeId", "ขนาด (มม.)"
-            elif layer == "leakpoint":
-                return "$properties.pipeSizesId", "ขนาดท่อ (มม.)"
+            sf = size_field(layer)
+            return ("$" + sf, LABEL_SIZE.get(layer, "ขนาด")) if sf else (None, None)
 
         if re.search(r"สถานะ", group_target):
-            if layer in ("valve", "firehydrant"):
-                return "$properties.statusId", "สถานะ"
-            elif layer == "meter":
-                return "$properties.custStat", "สถานะลูกค้า"
-            elif layer == "leakpoint":
-                return "$properties.LeakStatus", "สถานะ"
+            st = status_field(layer)
+            return ("$" + st, LABEL_STATUS.get(layer, "สถานะ")) if st else (None, None)
+            # leakpoint → status = None → คืน (None, None) → build() คืน None
+            #   → parse_rule จะไปลอง pattern ถัดไป (count) ตามลำดับเดิม
 
         if re.search(r"หน้าที่|ฟังก์ชัน", group_target):
             if layer == "pipe":

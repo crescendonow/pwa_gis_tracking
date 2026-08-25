@@ -19,7 +19,7 @@ class ShowPositionPattern:
             if ctx.layer == "pipe":
                 extra["properties.yearInstall"] = {"$lte": cutoff_year}
             elif ctx.layer == "meter":
-                cutoff_date = "{}-01-01T00:00:00Z".format(datetime.now().year - ctx.age)
+                cutoff_date = datetime(datetime.now().year - ctx.age, 1, 1)
                 extra["properties.beginCustDate"] = {"$lte": cutoff_date}
 
         match_stage = build_match(

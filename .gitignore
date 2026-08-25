@@ -4,5 +4,17 @@
 /services/text_to_query/.env
 /services/text_to_query/.env.example
 /.claude
+/.continue
+/.kilo
 /.vscode
+
+# Python microservice (text-to-query) — runtime/generated artifacts, ไม่ควร commit
+/services/text_to_query/__pycache__/
+**/__pycache__/
+/services/text_to_query/logs/
+/services/text_to_query/cache.db
+/services/text_to_query/venv/
+
+# Windows build output
+/pwa_gis_tracking.exe
 /deployment/map-services.env

@@ -25,6 +25,13 @@ func ParseCollectionAlias(alias, id string) (Collection, error) {
 	return Collection{Alias: alias, ID: id, PwaCode: matches[1], Layer: matches[2]}, nil
 }
 
+// IsRollupPwaCode reports collections at the region level (b{region}000_*).
+// These are stale snapshots that duplicate branch-level collections and have
+// been confirmed to hold no pwaCode absent from the branch collections.
+func IsRollupPwaCode(code string) bool {
+	return len(code) > 3 && strings.HasSuffix(code, "000")
+}
+
 // TransformFeature validates and normalises the Mongo document without losing
 // its stable identity or GeoJSON geometry.
 func TransformFeature(collection Collection, source SourceFeature, syncedAt time.Time) (MirrorFeature, error) {

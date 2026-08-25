@@ -24,17 +24,38 @@ func TestMongoCreatedTimeDoesNotFallBackToUpdatedTime(t *testing.T) {
 	}
 }
 
-func TestIncrementalMongoFilterReplaysCreationAndObjectIDTimestamps(t *testing.T) {
+func TestIncrementalMongoFilterStaysOnTheIndexedField(t *testing.T) {
 	since := time.Date(2026, 8, 23, 9, 0, 0, 0, time.UTC)
-	filter := fmt.Sprint(incrementalMongoFilter(&since))
-	for _, required := range []string{"_updatedAt", "properties.updatedAt", "_createdAt", "properties.createdAt", "ObjectID"} {
-		if !strings.Contains(filter, required) {
-			t.Fatalf("incremental filter %q is missing %q", filter, required)
-		}
+	filter := incrementalMongoFilter(&since)
+	if len(filter) != 1 {
+		t.Fatalf("incremental filter %v must match on properties._updatedAt alone, or MongoDB collection-scans every cycle", filter)
+	}
+	condition, ok := filter["properties._updatedAt"].(bson.M)
+	if !ok {
+		t.Fatalf("incremental filter %v does not use the properties._updatedAt_1 index", filter)
 	}
 	want := since.Add(-IncrementalReplayOverlap)
-	if !strings.Contains(filter, want.Format("2006-01-02")) {
-		t.Fatalf("incremental filter does not replay from %v: %s", want, filter)
+	if got, ok := condition["$gte"].(time.Time); !ok || !got.Equal(want) {
+		t.Fatalf("incremental filter replays from %v, want %v", condition["$gte"], want)
+	}
+}
+
+func TestMongoFindArgsResumesFullScansAndSortsForResume(t *testing.T) {
+	collection := Collection{Alias: "b5511011_pipe", PwaCode: "5511011", Layer: "pipe"}
+	resumeFrom := primitive.NewObjectIDFromTimestamp(time.Date(2026, 8, 23, 9, 0, 0, 0, time.UTC))
+
+	filter, findOptions := mongoFindArgs(collection, Cursor{AfterID: resumeFrom.Hex()})
+	condition, ok := filter["_id"].(bson.M)
+	if !ok || condition["$gt"] != resumeFrom {
+		t.Fatalf("full scan filter = %v, want _id greater than the saved cursor", filter)
+	}
+	if !strings.Contains(fmt.Sprint(findOptions.Sort), "_id") {
+		t.Fatalf("full scan must sort by _id so a resumed scan is deterministic, got %v", findOptions.Sort)
+	}
+
+	filter, _ = mongoFindArgs(collection, Cursor{AfterID: "not-an-object-id"})
+	if len(filter) != 0 {
+		t.Fatalf("an unusable cursor must restart the full scan, got %v", filter)
 	}
 }
 
@@ -49,5 +70,20 @@ func TestMongoObjectIDProvidesTimestampFallback(t *testing.T) {
 func TestSupportedMirrorLayersRejectUnrelatedCollections(t *testing.T) {
 	if !IsSupportedLayer("meter") || IsSupportedLayer("internal_audit") {
 		t.Fatal("supported mirror layer allow-list is not enforced")
+	}
+}
+
+func TestCollectionsSkipsRegionRollups(t *testing.T) {
+	collections := []Collection{
+		{Alias: "b5511000_pipe", PwaCode: "5511000", Layer: "pipe"},
+		{Alias: "b5511011_pipe", PwaCode: "5511011", Layer: "pipe"},
+	}
+	filtered := FilterCollections(collections, false)
+	if len(filtered) != 1 || filtered[0].PwaCode != "5511011" {
+		t.Fatalf("filtered = %#v, want only the branch collection", filtered)
+	}
+	included := FilterCollections(collections, true)
+	if len(included) != 2 {
+		t.Fatalf("included = %#v, want both when rollups are included", included)
 	}
 }

@@ -26,8 +26,9 @@ func init() {
 
 // chatbotRequest is the incoming request from the frontend.
 type chatbotRequest struct {
-	Prompt  string `json:"prompt" binding:"required"`
-	PwaCode string `json:"pwa_code"`
+	Prompt   string `json:"prompt" binding:"required"`
+	PwaCode  string `json:"pwa_code"`
+	ForceLLM bool   `json:"force_llm"`
 }
 
 // chatbotProxyPayload is what we forward to the Python service.
@@ -36,6 +37,7 @@ type chatbotProxyPayload struct {
 	PwaCode    string `json:"pwa_code"`
 	UID        string `json:"uid"`
 	Permission string `json:"permission"`
+	ForceLLM   bool   `json:"force_llm"`
 }
 
 // ChatbotQuery proxies the chatbot request to the Python text-to-query service.
@@ -87,6 +89,7 @@ func ChatbotQuery(c *gin.Context) {
 		PwaCode:    pwaCode,
 		UID:        uidStr,
 		Permission: permStr,
+		ForceLLM:   req.ForceLLM,
 	}
 
 	body, err := json.Marshal(payload)

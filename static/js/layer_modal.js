@@ -933,7 +933,7 @@ var LayerModal = (function() {
             'วันที่': 'recordDate'
         },
         leakpoint: {
-            'สาเหตุ': 'cause', 'สถานะ': 'LeakStatus',
+            'สาเหตุ': 'cause', 'สถานะ': 'typeId', 'ประเภท': 'typeId',
             'วันที่แจ้ง': 'leakDatetime', 'วันที่': 'leakDatetime',
             'ค่าซ่อม': 'repairCost', 'ชนิดท่อ': 'pipeTypeId'
         },

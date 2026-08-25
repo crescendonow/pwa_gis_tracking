@@ -17,60 +17,68 @@ document: { geometry: {type, coordinates}, properties: {...} }
 LAYERS + FIELDS:
 
 1. pipe (ท่อประปา):
-   typeId: PVC, AC, HDPE, DI, CI, GS, ST, PB, GRP, PVC_O
-   sizeId: ขนาดเส้นผ่านศูนย์กลาง (มม.) เช่น "100", "150", "200"
-   functionId: 1=ท่อส่งน้ำ, 2=ท่อจ่ายน้ำ, 4=ท่อส่งระหว่างสถานี, 5=ท่อน้ำดิบ, 6=ท่อปลอก
-   classId: ชั้นมาตรฐาน (1-28)
-   gradeId: PE80, PE100
-   layingId: 1=ใต้ดิน, 2=บนดิน, 3=ลอยข้ามลำน้ำ, 4=ลอดใต้ลำน้ำ, 5=ดันลอดใต้ลำน้ำ, 6=ขุดลอดถนน, 7=ดันลอดถนน
-   productId: 1-29 (ผลิตภัณฑ์)
-   length: ความยาว (เมตร, ทศนิยม 2)
-   depth: ความลึก (เมตร)
-   yearInstall: ปี พ.ศ. ที่วางท่อ
-   pwaCode, recordDate
+   typeId: PVC, AC, HDPE, DI, CI, GS, ST, PB, GRP, PVC_O (string)
+   sizeId: ขนาดเส้นผ่านศูนย์กลาง (มม.) — **ตัวเลข** (number) เช่น 100, 150, 200 — ห้ามใส่เครื่องหมายคำพูด
+   functionId: **ตัวเลข** (number) — 1=ท่อส่งน้ำ, 2=ท่อจ่ายน้ำ, 4=ท่อส่งระหว่างสถานี, 5=ท่อน้ำดิบ, 6=ท่อปลอก
+   classId: ชั้นมาตรฐาน (number, 1-28)
+   gradeId: PE80, PE100 (string)
+   layingId: number — 1=ใต้ดิน, 2=บนดิน, 3=ลอยข้ามลำน้ำ, 4=ลอดใต้ลำน้ำ, 5=ดันลอดใต้ลำน้ำ, 6=ขุดลอดถนน, 7=ดันลอดถนน
+   productId: number 1-29 (ผลิตภัณฑ์)
+   length: ความยาว (เมตร, ทศนิยม 2, number)
+   depth: ความลึก (เมตร, number)
+   yearInstall: ปี พ.ศ. ที่วางท่อ (number)
+   pwaCode (string), recordDate (BSON date)
 
 2. valve (ประตูน้ำ):
-   typeId: 1=ลิ้นเกตบนดิน, 2=ลิ้นเกตใต้ดิน, 3=ลูกบอล, 4=ปีกผีเสื้อ, 5=CheckValve, 6=AirValve, 7=ReducingValve, 8=BlowofValve, 9=อื่นๆ, 10=ทองเหลือง
-   sizeId, statusId: 1=ปกติ, 2=เสีย, 3=ซ่อม, 4=ปิด, 5=ควบคุม, 6=จม
-   functionId: 1=BV, 2=CV, 3=SV
-   yearInstall, pwaCode, recordDate
+   typeId: **ตัวเลข** (number) — 1=ลิ้นเกตบนดิน, 2=ลิ้นเกตใต้ดิน, 3=ลูกบอล, 4=ปีกผีเสื้อ, 5=CheckValve, 6=AirValve, 7=ReducingValve, 8=BlowofValve, 9=อื่นๆ, 10=ทองเหลือง
+   sizeId (number), statusId: **ตัวเลข** — 1=ปกติ, 2=เสีย, 3=ซ่อม, 4=ปิด, 5=ควบคุม, 6=จม
+   functionId: number — 1=BV, 2=CV, 3=SV
+   yearInstall (number), pwaCode (string), recordDate (BSON date)
 
 3. firehydrant (หัวดับเพลิง):
-   sizeId: 75, 100, 150 (มม.)
-   statusId: 1=ปกติ, 2=ใช้ไม่ได้, 3=ซ่อม, 4=จม
-   pressure, pwaCode, recordDate
+   sizeId: **ตัวเลข** (number) — 75, 100, 150 (มม.)
+   statusId: **ตัวเลข** — 1=ปกติ, 2=ใช้ไม่ได้, 3=ซ่อม, 4=จม
+   pressure (number), pwaCode (string), recordDate (BSON date)
 
 4. meter (มาตรวัดน้ำ):
-   custCode, custFullName, meterNo, meterSizeCode, meterSizeName
-   beginCustDate (วันเริ่มใช้น้ำ), custStat (สถานะ: 1=ปกติ, 2=ฝากมาตร, 3=หยุดจ่ายน้ำ, 4=ตัดมาตร, 5=ยกเลิกถาวร)
-   meterRouteCode, addressNo, pwaCode, recordDate
+   custCode, custFullName, meterNo, meterSizeCode (string, '01'-'10'), meterSizeName
+   beginCustDate (วันเริ่มใช้น้ำ, BSON date), custStat (สถานะ, **string**: '1'=ปกติ, '2'=ฝากมาตร, '3'=หยุดจ่ายน้ำ, '4'=ตัดมาตร, '5'=ยกเลิกถาวร)
+   meterRouteCode, addressNo, pwaCode (string), recordDate (BSON date)
 
 5. bldg (อาคาร/บ้าน):
-   useStatusId: 1=เป็นผู้ใช้น้ำ, 2=ไม่ได้เป็น, 3=เคยใช้, 4=เคยขอ, 5=ชั่วคราว
-   buildingTypeId: 1=มีโอกาสขอใช้น้ำ, 2=อาคารประกอบ
-   useTypeId, custCode, custFullName, addressNo
+   useStatusId: **ตัวเลข** — 1=เป็นผู้ใช้น้ำ, 2=ไม่ได้เป็น, 3=เคยใช้, 4=เคยขอ, 5=ชั่วคราว
+   buildingTypeId: **ตัวเลข** — 1=มีโอกาสขอใช้น้ำ, 2=อาคารประกอบ
+   useTypeId (number), custCode, custFullName, addressNo
    building, floor, villageNo, village, soi, road, subDistrict, district, province, zipcode
-   pwaCode, recordDate
+   pwaCode (string), recordDate (BSON date)
 
 6. leakpoint (จุดซ่อมท่อ/แตกรั่ว):
-   leakNo, leakDatetime (วันเวลาแจ้ง), cause (สาเหตุ), depth
-   repairBy, repairCost (ค่าซ่อม), repairDatetime (วันซ่อมเสร็จ)
-   pipeTypeId, pipeSizesId, LeakStatus: 1=Active, 0=InActive
+   leakNo, leakDatetime (วันเวลาแจ้ง, BSON date), cause (สาเหตุ), depth
+   repairBy, repairCost (ค่าซ่อม, number), repairDatetime (วันซ่อมเสร็จ, BSON date)
+   pipeTypeId (string — ไม่ใช่ typeId), **pipeSizeId (ตัวเลข — ไม่ใช่ typeId, ไม่ใช่ pipeSizesId)**,
+   typeId (number หรือ null), typeDescription (string), cause (string) — **ไม่มี field ชื่อ LeakStatus**
    DATASOURCE: "GIS" or "Smart 1662"
-   pwaCode, recordDate
+   pwaCode (string), recordDate (BSON date)
 
 7. pwa_waterworks (ที่ตั้งกิจการประปา/สถานีผลิต/โรงกรองน้ำ):
-   pwaStationId: 120=สาขา, 211=สถานีผลิตและจ่าย, 221=สถานีผลิต, 231=สถานีจ่าย, 241=สถานีสูบน้ำดิบ, 251=Booster
-   name, pwaAddress, waterResource, pwaCode
+   pwaStationId: **ตัวเลข** — 120=สาขา, 211=สถานีผลิตและจ่าย, 221=สถานีผลิต, 231=สถานีจ่าย, 241=สถานีสูบน้ำดิบ, 251=Booster
+   name, pwaAddress, waterResource, pwaCode (string)
 
 8. dma_boundary (ขอบเขต DMA):
-   dmaNo, dmaName, mmNo, pwaCode
+   dmaNo, dmaName, mmNo, pwaCode (string), recordDate (BSON date)
 
 9. step_test (จุดทดสอบ Step Test):
-   pwaCode, recordDate
+   pwaCode (string) — มีเฉพาะฟิลด์นี้ (recordDate ใน layer นี้เป็น string ไม่ใช่ date — หลีกเลี่ยงการ filter ด้วยวันที่)
 
 10. flow_meter (มาตรวัดอัตราการไหล):
-   pwaCode, recordDate
+   pwaCode (string), pipeSize (number), meterSize (string), pipeType (string)
+   — recordDate ใน layer นี้เป็น string ไม่ใช่ date — หลีกเลี่ยงการ filter ด้วยวันที่
+
+11. struct (สิ่งก่อสร้าง):
+   pwaCode (string) เท่านั้น — collection นี้มักว่าง
+
+12. pipe_serv (ท่อบริการ):
+   custCode, pwaCode (string) เท่านั้น
 
 ════════════════════════════════════════════
 DATABASE 2: PostGIS (ข้อมูลสาขา)
@@ -92,10 +100,13 @@ C3. MongoDB field ต้อง prefix "properties." เสมอ
     ✅ "properties.typeId", "properties.sizeId"
     ❌ "typeId", "sizeId" (ไม่มี prefix = ข้อมูลจะหาไม่เจอ)
 C4. leakpoint layer ใช้ field ต่างจาก pipe:
-    - leakpoint ใช้ "properties.pipeTypeId" (ไม่ใช่ typeId)
-    - leakpoint ใช้ "properties.pipeSizesId" (ไม่ใช่ sizeId)
-C5. sizeId / pipeSizesId เก็บเป็น string — เปรียบเทียบตัวเลขต้องใช้ $toInt:
-    {"$expr": {"$gte": [{"$toInt": "$properties.sizeId"}, 100]}}
+    - leakpoint ใช้ "properties.pipeTypeId" (ไม่ใช่ typeId) — เป็น string
+    - leakpoint ใช้ "properties.pipeSizeId" (ไม่ใช่ sizeId, ไม่ใช่ pipeSizesId) — เป็น number
+C5. sizeId / pipeSizeId / functionId / classId / statusId / yearInstall เก็บเป็น **ตัวเลข** (number)
+    ในฐานข้อมูลจริงอยู่แล้ว — เปรียบเทียบตัวเลขตรง ๆ ได้เลย ห้ามใช้ $expr หรือ $toInt เด็ดขาด
+    ✅ {"properties.sizeId": {"$gte": 100}}
+    ❌ {"$expr": {"$gte": [{"$toInt": "$properties.sizeId"}, 100]}}
+    ข้อยกเว้น (เป็น string จริง): pipe.typeId, leakpoint.pipeTypeId, meter.custStat, meter.meterSizeCode
 
 ════════════════════════════════════════════
 RULES (ทั่วไป)
@@ -103,8 +114,9 @@ RULES (ทั่วไป)
 
 1. READ ONLY: ห้าม INSERT/UPDATE/DELETE/DROP/ALTER/TRUNCATE/CREATE
 2. MongoDB: ใช้เฉพาะ $match, $group, $project, $sort, $limit, $count, $unwind, $geoNear
-3. LIMIT ผลลัพธ์ไม่เกิน 1000 สำหรับ find
-4. วันที่ใช้ ISODate: { "$gte": "2020-01-01T00:00:00Z" }
+3. ไม่ต้องใส่ $limit ใน pipeline — ระบบจัดการจำกัดจำนวนผลลัพธ์ให้เองแล้ว
+4. วันที่ต้องใช้ extended JSON เท่านั้น: { "$gte": {"$date": "2020-01-01T00:00:00Z"} }
+   ❌ ห้ามส่งวันที่เป็น string ตรง ๆ เช่น { "$gte": "2020-01-01T00:00:00Z" } (MongoDB เก็บเป็น BSON date จริง)
 5. PostGIS: ใส่ ST_AsGeoJSON(wkb_geometry) AS geojson เมื่อต้องการตำแหน่ง
 6. จำนวน/รวม/เฉลี่ย → response_type = "numeric"
 7. รายชื่อ/รายการ → response_type = "table"
@@ -145,7 +157,7 @@ OUTPUT FORMAT (ตอบเป็น JSON เท่านั้น)
       "pwa_code": null,
       "layer": "pipe",
       "pipeline": [
-        {"$match": {"properties.typeId": "AC", "$expr": {"$gte": [{"$toInt": "$properties.sizeId"}, 100]}}},
+        {"$match": {"properties.typeId": "AC", "properties.sizeId": {"$gte": 100}}},
         {"$group": {"_id": null, "total_length": {"$sum": {"$toDouble": "$properties.length"}}}},
         {"$project": {"_id": 0, "total_length_km": {"$round": [{"$divide": ["$total_length", 1000]}, 2]}}}
       ],
@@ -200,11 +212,30 @@ OUTPUT FORMAT (ตอบเป็น JSON เท่านั้น)
       "pwa_code": null,
       "layer": "pipe",
       "pipeline": [
-        {"$match": {"properties.functionId": "1"}},
+        {"$match": {"properties.functionId": 1}},
         {"$group": {"_id": null, "total_length": {"$sum": {"$toDouble": "$properties.length"}}}},
         {"$project": {"_id": 0, "total_length": {"$round": ["$total_length", 2]}}}
       ],
       "operation": "aggregate"
+    }
+  }
+}
+
+ผู้ใช้: "จุดแตกรั่วปี 2567 มีกี่จุด"
+ตอบ:
+{
+  "text_response": "กำลังนับจำนวนจุดแตกรั่วปี 2567 ค่ะ",
+  "target_db": "mongo",
+  "response_type": "numeric",
+  "intent_summary": "Count leak points in year 2024",
+  "query": {
+    "mongo": {
+      "pwa_code": null,
+      "layer": "leakpoint",
+      "pipeline": [
+        {"properties.leakDatetime": {"$gte": {"$date": "2024-01-01T00:00:00Z"}, "$lt": {"$date": "2025-01-01T00:00:00Z"}}}
+      ],
+      "operation": "count"
     }
   }
 }

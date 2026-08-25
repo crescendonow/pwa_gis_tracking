@@ -57,7 +57,8 @@
     byId("sidebarOpen").addEventListener("click", () => toggleSidebar(false));
     byId("quickSearchButton").addEventListener("click", quickSearch);
     byId("quickSearch").addEventListener("keydown", (event) => { if (event.key === "Enter") quickSearch(); });
-    byId("mapZone").addEventListener("change", updateBranchOptions);
+    byId("mapZone").addEventListener("change", () => { updateBranchOptions(); applyFilters(); });
+    byId("mapBranch").addEventListener("change", applyFilters);
     byId("applyFilters").addEventListener("click", applyFilters);
     byId("clearFilters").addEventListener("click", clearFilters);
     byId("terrainToggle").addEventListener("change", toggleTerrain);

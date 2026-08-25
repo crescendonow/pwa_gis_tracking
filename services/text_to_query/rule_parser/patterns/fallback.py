@@ -2,6 +2,9 @@
 
 from datetime import datetime
 
+from ..daterange import year_range, month_range
+from ..mappings.fields import date_field
+
 
 class FallbackDatePattern:
     """FALLBACK: layer + date/fiscal year → count (no explicit จำนวน/กี่)."""
@@ -13,29 +16,23 @@ class FallbackDatePattern:
         filt = {}
         if ctx.effective_pwa:
             filt["properties.pwaCode"] = ctx.effective_pwa
-        date_field = "properties.leakDatetime" if ctx.layer == "leakpoint" else "properties.recordDate"
+        dfield = date_field(ctx.layer)
 
         if ctx.fiscal_start:
-            filt[date_field] = {"$gte": ctx.fiscal_start, "$lt": ctx.fiscal_end}
+            filt[dfield] = {"$gte": ctx.fiscal_start, "$lt": ctx.fiscal_end}
             date_desc = "ปีงบประมาณ {} ".format(ctx.fiscal_year)
         elif ctx.year and ctx.month:
-            start = "{}-{:02d}-01T00:00:00Z".format(ctx.year, ctx.month)
-            end = ("{}-01-01T00:00:00Z".format(ctx.year + 1) if ctx.month == 12
-                   else "{}-{:02d}-01T00:00:00Z".format(ctx.year, ctx.month + 1))
-            filt[date_field] = {"$gte": start, "$lt": end}
+            start, end = month_range(ctx.year, ctx.month)
+            filt[dfield] = {"$gte": start, "$lt": end}
             date_desc = "เดือน {}/{} ".format(ctx.month, ctx.year + 543)
         elif ctx.year:
-            filt[date_field] = {
-                "$gte": "{}-01-01T00:00:00Z".format(ctx.year),
-                "$lt": "{}-01-01T00:00:00Z".format(ctx.year + 1),
-            }
+            start, end = year_range(ctx.year)
+            filt[dfield] = {"$gte": start, "$lt": end}
             date_desc = "ปี {} ".format(ctx.year + 543)
         else:
             cy = datetime.now().year
-            start = "{}-{:02d}-01T00:00:00Z".format(cy, ctx.month)
-            end = ("{}-01-01T00:00:00Z".format(cy + 1) if ctx.month == 12
-                   else "{}-{:02d}-01T00:00:00Z".format(cy, ctx.month + 1))
-            filt[date_field] = {"$gte": start, "$lt": end}
+            start, end = month_range(cy, ctx.month)
+            filt[dfield] = {"$gte": start, "$lt": end}
             date_desc = "เดือน {} ".format(ctx.month)
 
         return {

@@ -76,6 +76,78 @@ func TestGetMapTileRejectsMeterBelowProgressiveZoomBeforeUpstream(t *testing.T) 
 	}
 }
 
+func TestGetMapTileReturnsNoContentWhenMartinHasEmptyTile(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer upstream.Close()
+	t.Setenv("MARTIN_URL", upstream.URL)
+	previousClient := mapHTTPClient
+	mapHTTPClient = upstream.Client()
+	t.Cleanup(func() { mapHTTPClient = previousClient })
+
+	recorder := httptest.NewRecorder()
+	context, _ := gin.CreateTestContext(recorder)
+	context.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	context.Params = gin.Params{{Key: "layer", Value: "meter"}, {Key: "z", Value: "14"}, {Key: "x", Value: "13250"}, {Key: "y", Value: "7560"}}
+	context.Set("permission_leak", "all")
+
+	GetMapTile(context)
+	if recorder.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, want 204, body=%q", recorder.Code, recorder.Body.String())
+	}
+	if recorder.Body.Len() != 0 {
+		t.Fatalf("body = %q, want empty on 204", recorder.Body.String())
+	}
+}
+
+func TestGetMapTileReturnsNoContentWhenMartinHasNoSourceForTheTile(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer upstream.Close()
+	t.Setenv("MARTIN_URL", upstream.URL)
+	previousClient := mapHTTPClient
+	mapHTTPClient = upstream.Client()
+	t.Cleanup(func() { mapHTTPClient = previousClient })
+
+	recorder := httptest.NewRecorder()
+	context, _ := gin.CreateTestContext(recorder)
+	context.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	context.Params = gin.Params{{Key: "layer", Value: "meter"}, {Key: "z", Value: "14"}, {Key: "x", Value: "13250"}, {Key: "y", Value: "7560"}}
+	context.Set("permission_leak", "all")
+
+	GetMapTile(context)
+	if recorder.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, want 204, body=%q", recorder.Code, recorder.Body.String())
+	}
+}
+
+func TestGetMapTileReturnsBadGatewayWhenMartinFails(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer upstream.Close()
+	t.Setenv("MARTIN_URL", upstream.URL)
+	previousClient := mapHTTPClient
+	mapHTTPClient = upstream.Client()
+	t.Cleanup(func() { mapHTTPClient = previousClient })
+
+	recorder := httptest.NewRecorder()
+	context, _ := gin.CreateTestContext(recorder)
+	context.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	context.Params = gin.Params{{Key: "layer", Value: "meter"}, {Key: "z", Value: "14"}, {Key: "x", Value: "13250"}, {Key: "y", Value: "7560"}}
+	context.Set("permission_leak", "all")
+
+	GetMapTile(context)
+	if recorder.Code != http.StatusBadGateway {
+		t.Fatalf("status = %d, want 502, body=%q", recorder.Code, recorder.Body.String())
+	}
+}
+
 func TestGetMapTileAppliesAllScopeZoneFilter(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	var upstreamQuery url.Values

@@ -155,10 +155,11 @@ func LoadMapSummary(scope, branch, zone string, officesByZone func(string) ([]st
 	if err != nil {
 		return nil, nil, err
 	}
-	if config.PgDB == nil {
+	mapDB := config.MapDatabase()
+	if mapDB == nil {
 		return nil, nil, errors.New("PostGIS is unavailable")
 	}
-	rows, err := config.PgDB.Query(`
+	rows, err := mapDB.Query(`
 		SELECT layer, SUM(feature_count), MAX(updated_at)
 		FROM pwa_tracking_map.map_summary
 		WHERE $1 = '*' OR pwa_code = ANY(string_to_array($1, ','))

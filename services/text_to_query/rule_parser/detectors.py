@@ -13,6 +13,7 @@ from .mappings import (
     METER_STATUS_KW, _SORTED_METER_STATUS_KW,
     _THAI_MONTHS, _SORTED_MONTH_KW,
 )
+from .daterange import fiscal_range
 
 
 def detect_layer(text):
@@ -127,12 +128,7 @@ def detect_fiscal_year(text):
     m = re.search(r"ปีงบ(?:ประมาณ)?\s*(?:พ\.?ศ\.?\s*)?(\d{4})", text)
     if m:
         be_year = int(m.group(1))
-        if be_year > 2400:
-            ce_year = be_year - 543
-        else:
-            ce_year = be_year
-        start = "{}-10-01T00:00:00Z".format(ce_year - 1)
-        end = "{}-10-01T00:00:00Z".format(ce_year)
+        start, end = fiscal_range(be_year)
         return start, end, be_year
     return None, None, None
 
@@ -203,9 +199,14 @@ class ParseContext:
             r"(?:ความยาว|ยาว).*(?:รวม|ทั้งหมด|ทั้งประเทศ)|รวม.*(?:กี่เมตร|เมตร|กม\.?|กิโลเมตร)",
             text
         ))
-        self.is_pipe_total = self.layer == "pipe" and bool(re.search(
-            r"รวม.*(?:เมตร|กม|กิโล)|ยาว.*(?:รวม|ทั้งหมด|กี่)", text
-        ))
+        # "ความยาว" (คำนาม) เพียงคำเดียวก็สื่อว่าต้องการ "ค่าความยาวรวม" อยู่แล้ว แม้ประโยคจะไม่มี
+        # "รวม"/"ทั้งหมด"/"กี่" ต่อท้าย เช่น "ความยาวท่อจ่ายน้ำขนาด 100 ขึ้นไป อายุมากกว่า 30 ปี สาขาพัทยา"
+        # (ตัวอย่างคำถามใน templates/detail.html ข้อ 7) — เว้นแต่เป็นคำถามแยกกลุ่ม (is_group)
+        # ซึ่งควรปล่อยให้ GroupByPattern จัดการแทน
+        self.is_pipe_total = self.layer == "pipe" and bool(
+            re.search(r"รวม.*(?:เมตร|กม|กิโล)|ยาว.*(?:รวม|ทั้งหมด|กี่)", text)
+            or (not self.is_group and re.search(r"ความยาว", text))
+        )
 
         # Zone
         self.zone = detect_postgis_zone(text)

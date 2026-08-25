@@ -75,6 +75,19 @@ FORBIDDEN_MONGO_OPS = {
 }
 
 
+def _walk_keys(node):
+    """Recursively yield every dict key in a pipeline structure (for safe keyword checks)."""
+    if isinstance(node, dict):
+        for k, v in node.items():
+            yield k
+            for kk in _walk_keys(v):
+                yield kk
+    elif isinstance(node, list):
+        for item in node:
+            for kk in _walk_keys(item):
+                yield kk
+
+
 def validate_mongo_pipeline(pipeline):
     """
     Validate MongoDB aggregation pipeline is read-only.
@@ -84,7 +97,9 @@ def validate_mongo_pipeline(pipeline):
         log.warning("MongoDB rejected: pipeline is not a list")
         return False
 
-    pipeline_str = json.dumps(pipeline).lower()
+    # pipeline อาจมี datetime object (BSON date filters) — ต้อง serialize ด้วย default=str
+    # เพื่อไม่ให้ TypeError ตอน json.dumps
+    pipeline_str = json.dumps(pipeline, default=str).lower()
 
     # Check for forbidden stages
     for stage in FORBIDDEN_MONGO_STAGES:
@@ -92,20 +107,12 @@ def validate_mongo_pipeline(pipeline):
             log.warning("MongoDB rejected: contains forbidden stage %s", stage)
             return False
 
-    # Check for forbidden operations in string form
-    for op in FORBIDDEN_MONGO_OPS:
-        if op in pipeline_str:
-            log.warning("MongoDB rejected: contains forbidden operation %s", op)
+    # Check keys only (recursive) — ไม่ค้นทั้งสตริง เพราะจะ false-positive กับค่าที่บังเอิญ
+    # มีคำต้องห้ามอยู่ข้างใน เช่น "properties._updatedAt"
+    for key in _walk_keys(pipeline):
+        if key.lower().lstrip("$") in FORBIDDEN_MONGO_OPS | {"merge", "out", "delete"}:
+            log.warning("MongoDB rejected: key %s is forbidden", key)
             return False
-
-    # Walk the pipeline stages
-    for stage in pipeline:
-        if not isinstance(stage, dict):
-            continue
-        for key in stage:
-            if key.lower().lstrip("$") in {"merge", "out", "delete"}:
-                log.warning("MongoDB rejected: stage key %s is forbidden", key)
-                return False
 
     return True
 

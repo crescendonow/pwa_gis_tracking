@@ -15,6 +15,11 @@ import (
 // PgDB is the shared PostgreSQL connection pool.
 var PgDB *sql.DB
 
+// MapDB is the optional connection to the map-tile mirror database
+// (pwa_tracking_map), which normally lives on a different server than PgDB.
+// Access it through MapDatabase(), never directly.
+var MapDB *sql.DB
+
 // MongoDB is the shared MongoDB client.
 var MongoDB *mongo.Client
 
@@ -50,6 +55,42 @@ func ConnectPostgres() {
 
 	PgDB = db
 	log.Println("PostgreSQL connected")
+}
+
+// ConnectMapDatabase opens the optional map-mirror connection. Unlike
+// ConnectPostgres, a missing or unreachable MAP_DATABASE_URL never fails
+// startup: it just logs and leaves MapDB nil so MapDatabase() falls back to
+// PgDB (which will 503 map summary requests until the mirror is reachable).
+func ConnectMapDatabase() {
+	dsn := os.Getenv("MAP_DATABASE_URL")
+	if dsn == "" {
+		log.Println("MAP_DATABASE_URL is not set; map summary falls back to PgDB")
+		return
+	}
+	db, err := sql.Open("pgx", dsn)
+	if err != nil {
+		log.Printf("map database open error: %v", err)
+		return
+	}
+	if err := db.Ping(); err != nil {
+		log.Printf("map database ping failed: %v", err)
+		_ = db.Close()
+		return
+	}
+	db.SetMaxOpenConns(5)
+	db.SetMaxIdleConns(2)
+	db.SetConnMaxLifetime(30 * time.Minute)
+	MapDB = db
+	log.Println("Map mirror database connected")
+}
+
+// MapDatabase returns the mirror connection when MAP_DATABASE_URL is
+// configured and reachable, otherwise falls back to the shared PgDB.
+func MapDatabase() *sql.DB {
+	if MapDB != nil {
+		return MapDB
+	}
+	return PgDB
 }
 
 func buildPgDSN() string {

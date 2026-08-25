@@ -15,24 +15,16 @@
       rel="stylesheet"
     />
     <script src="https://unpkg.com/maplibre-gl@4.5.0/dist/maplibre-gl.js"></script>
-    <script src="https://unpkg.com/flatgeobuf@3.30.0/dist/flatgeobuf-geojson.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
     <link
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
     />
-    <!-- AG Grid Community -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@32.3.3/styles/ag-grid.css" />
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@32.3.3/styles/ag-theme-alpine.css" />
-    <script src="https://cdn.jsdelivr.net/npm/ag-grid-community@32.3.3/dist/ag-grid-community.min.noStyle.js"></script>
     <link rel="stylesheet" href="/pwa_gis_tracking/static/css/style.css" />
     <link rel="stylesheet" href="/pwa_gis_tracking/static/css/responsive.css" />
-    <link rel="stylesheet" href="/pwa_gis_tracking/static/css/chatbot.css" />
-    <link rel="stylesheet" href="/pwa_gis_tracking/static/css/advanced_query.css" />
-    <link rel="icon" type="image/jpeg" href="/pwa_gis_tracking/static/images/pwa-logo.jpg" />
     <style>
       #detailMapContainer {
-        display: block;
+        display: none;
       }
       #detailMap {
         width: 100%;
@@ -41,32 +33,32 @@
       }
       /* Map popup */
       .maplibregl-popup-content {
-        background: #FFFFFF;
-        color: #1A1A1A;
-        border: 1px solid rgba(0, 0, 0, 0.12);
+        background: #1c2538;
+        color: #f1f5f9;
+        border: 1px solid rgba(148, 163, 184, 0.15);
         border-radius: 10px;
         padding: 0;
         max-width: 380px;
         max-height: 420px;
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
       }
       .maplibregl-popup-close-button {
-        color: #4A4A4A;
+        color: #94a3b8;
         font-size: 18px;
         padding: 4px 8px;
       }
       .maplibregl-popup-close-button:hover {
-        color: #1A1A1A;
+        color: #fff;
       }
       .maplibregl-popup-tip {
-        border-top-color: #FFFFFF;
+        border-top-color: #1c2538;
       }
       .popup-header {
         padding: 10px 14px;
-        border-bottom: 1px solid rgba(0, 0, 0, 0.12);
-        font-weight: 700;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+        font-weight: 600;
         font-size: 13px;
-        color: #3F74CA;
+        color: #d4a843;
       }
       .popup-body {
         padding: 8px 14px;
@@ -80,18 +72,18 @@
       }
       .popup-body td {
         padding: 3px 0;
-        border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+        border-bottom: 1px solid rgba(148, 163, 184, 0.05);
         vertical-align: top;
       }
       .popup-body td:first-child {
-        color: #4A4A4A;
-        font-weight: 600;
+        color: #94a3b8;
+        font-weight: 500;
         padding-right: 10px;
         white-space: nowrap;
         width: 40%;
       }
       .popup-body td:last-child {
-        color: #1A1A1A;
+        color: #f1f5f9;
         word-break: break-all;
       }
 
@@ -106,19 +98,19 @@
         margin-bottom: 12px;
       }
       .perm-banner.perm-all {
-        background: rgba(62, 186, 150, 0.1);
-        border: 1px solid rgba(62, 186, 150, 0.25);
-        color: #15866B;
+        background: rgba(212, 168, 67, 0.15);
+        border: 1px solid rgba(212, 168, 67, 0.3);
+        color: #d4a843;
       }
       .perm-banner.perm-reg {
-        background: rgba(63, 116, 202, 0.1);
-        border: 1px solid rgba(63, 116, 202, 0.25);
-        color: #355398;
+        background: rgba(52, 152, 219, 0.15);
+        border: 1px solid rgba(52, 152, 219, 0.3);
+        color: #3498db;
       }
       .perm-banner.perm-branch {
-        background: rgba(62, 186, 150, 0.1);
-        border: 1px solid rgba(62, 186, 150, 0.25);
-        color: #15866B;
+        background: rgba(46, 204, 113, 0.15);
+        border: 1px solid rgba(46, 204, 113, 0.3);
+        color: #2ecc71;
       }
 
       /* Dual list for drag-drop */
@@ -167,7 +159,7 @@
         transition: background 0.15s;
       }
       .dual-list-item:hover {
-        background: rgba(63, 116, 202, 0.06);
+        background: rgba(148, 163, 184, 0.1);
       }
       .dual-list-item .grip {
         color: var(--text-muted);
@@ -190,10 +182,10 @@
       }
       .sortable-ghost {
         opacity: 0.4;
-        background: rgba(62, 186, 150, 0.15) !important;
+        background: rgba(212, 168, 67, 0.2) !important;
       }
       .sortable-chosen {
-        background: rgba(63, 116, 202, 0.1) !important;
+        background: rgba(52, 152, 219, 0.15) !important;
       }
 
       /* Layer checkbox grid */
@@ -219,8 +211,8 @@
         border-color: var(--text-muted);
       }
       .layer-chip.selected {
-        border-color: var(--pwa-blue);
-        background: rgba(63, 116, 202, 0.08);
+        border-color: var(--pwa-gold);
+        background: rgba(212, 168, 67, 0.1);
       }
       .layer-chip .dot {
         width: 10px;
@@ -261,15 +253,15 @@
         color: var(--text-primary);
       }
       .map-ctrl-btn.active {
-        border-color: var(--pwa-blue);
-        color: var(--pwa-blue);
+        border-color: var(--pwa-gold);
+        color: var(--pwa-gold);
       }
       .map-layer-panel {
         position: absolute;
         top: 10px;
         left: 10px;
         z-index: 10;
-        background: rgba(255, 255, 255, 0.95);
+        background: rgba(28, 37, 56, 0.95);
         border: 1px solid var(--border);
         border-radius: 8px;
         padding: 8px;
@@ -288,10 +280,10 @@
         border-radius: 4px;
       }
       .map-layer-toggle:hover {
-        background: rgba(63, 116, 202, 0.06);
+        background: rgba(148, 163, 184, 0.1);
       }
       .map-layer-toggle input {
-        accent-color: var(--pwa-blue);
+        accent-color: var(--pwa-gold);
       }
       .map-layer-toggle .ldot {
         width: 8px;
@@ -353,7 +345,7 @@
       .map-footer {
         padding: 8px 20px;
         font-size: 12px;
-        color: #757575;
+        color: #64748b;
         display: flex;
         align-items: center;
         justify-content: space-between;
@@ -380,7 +372,7 @@
         class="max-w-screen-2xl mx-auto px-4 py-3 flex items-center justify-between"
       >
         <div class="nav-brand">
-          <div class="logo-icon"><img src="/pwa_gis_tracking/static/images/pwa-logo.jpg" alt="PWA" style="width:100%;height:100%;object-fit:cover;transform:scale(1.06);border-radius:inherit;"></div>
+          <div class="logo-icon">GIS</div>
           <div>
             <h1>PWA GIS Online Tracking</h1>
             <span>ระบบติดตามข้อมูล GIS ออนไลน์</span>
@@ -400,10 +392,11 @@
           <a href="/pwa_gis_tracking/detail" class="nav-link active"
             ><i class="fa-solid fa-file-lines"></i> รายละเอียด</a
           >
-          <a href="/pwa_gis_tracking/map" class="nav-link"
-            ><i class="fa-solid fa-map-location-dot"></i> แผนที่</a
-          >
-          <span id="navUserName"></span>
+          <span
+            id="navUserName"
+            class="text-xs"
+            style="color: var(--text-muted)"
+          ></span>
           <a href="/pwa_gis_tracking/logout" class="nav-link" title="ออกจากระบบ"
             ><i class="fa-solid fa-right-from-bracket"></i
           ></a>
@@ -454,9 +447,6 @@
               <button class="btn btn-primary flex-1" onclick="executeQuery()">
                 <i class="fa-solid fa-magnifying-glass"></i> ค้นหา
               </button>
-              <button class="btn flex-1" onclick="openAdvancedQuery()" style="background:var(--surface-2);border:1px solid var(--pwa-blue);color:var(--pwa-blue);">
-                <i class="fa-solid fa-filter"></i> การค้นหาขั้นสูง
-              </button>
               <button
                 class="btn"
                 onclick="resetSelection()"
@@ -487,7 +477,7 @@
                   class="text-xs px-2 py-1 rounded"
                   style="
                     color: var(--pwa-gold);
-                    background: rgba(62, 186, 150, 0.1);
+                    background: rgba(212, 168, 67, 0.1);
                   "
                   onclick="selectAllLayers()"
                 >
@@ -525,7 +515,6 @@
             <h3>
               <i class="fa-solid fa-map-location-dot"></i>
               <span id="mapTitle">แผนที่ข้อมูล</span>
-              <!-- <span id="dmapZoom" style="margin-left: 10px; color: #666; font-size: 0.8em; font-weight: normal;"></span> -->
             </h3>
             <span
               id="mapFeatureCount"
@@ -680,7 +669,7 @@
                       class="text-xs px-2 py-1 rounded"
                       style="
                         color: var(--pwa-gold);
-                        background: rgba(62, 186, 150, 0.1);
+                        background: rgba(212, 168, 67, 0.1);
                       "
                       onclick="addAllExportLayers()"
                     >
@@ -703,22 +692,13 @@
                 <div class="flex items-center gap-3 mb-4">
                   <label class="filter-label">รูปแบบ</label>
                   <select id="exportFormat" class="flex-1">
-                    <option value="geojson" data-tier="full">GeoJSON (.geojson)</option>
-                    <option value="gpkg" data-tier="full">GeoPackage (.gpkg)</option>
-                    <option value="shp" data-tier="full">Shape File (.shp)</option>
-                    <option value="fgb" data-tier="full">FlatGeobuf (.fgb)</option>
-                    <option value="tab" data-tier="full">MapInfo TAB (.tab)</option>
-                    <option value="pmtiles" data-tier="full">PMTiles (.pmtiles)</option>
+                    <option value="geojson">GeoJSON (.geojson)</option>
+                    <option value="gpkg">GeoPackage (.gpkg)</option>
+                    <option value="shp">Shape File (.shp)</option>
+                    <option value="fgb">FlatGeobuf (.fgb)</option>
+                    <option value="tab">MapInfo TAB (.tab)</option>
+                    <option value="pmtiles">PMTiles (.pmtiles)</option>
                   </select>
-                </div>
-                <div
-                  id="exportTierNotice"
-                  class="text-sm mb-3"
-                  style="display:none; color: var(--warning, #f59e0b);"
-                >
-                  <i class="fa-solid fa-circle-info"></i>
-                  สิทธิ์ของคุณดาวน์โหลดได้เฉพาะไฟล์ Excel และ CSV เท่านั้น
-                  กรุณาใช้เมนู Export Excel แทน
                 </div>
                 <!-- Merge/Split mode (visible when multi-branch or multi-layer) -->
                 <div id="exportMergeContainer" class="flex items-center gap-3 mb-4" style="display:none">
@@ -766,8 +746,8 @@
       class="max-w-screen-2xl mx-auto px-4 py-6 text-center relative z-10"
     >
       <p class="text-xs" style="color: var(--text-muted)">
-        สงวนลิขสิทธิ์ พ.ศ. 2569 กองเทคโนโลยีสารสนเทศระบบประปา | การประปาส่วนภูมิภาค<br>
-        อยู่ในระหว่างการพัฒนาระบบโดย: งานข้อมูลภูมิสารสนเทศ | กองเทคโนโลยีสารสนเทศระบบประปา โทร: 02-551-8752
+        PWA GIS Online Tracking Dashboard © 2025 — Provincial Waterworks
+        Authority
       </p>
     </footer>
 
@@ -775,7 +755,6 @@
     <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/th.js"></script>
     <script src="/pwa_gis_tracking/static/js/thai_custom_date.js"></script>
     <script src="/pwa_gis_tracking/static/js/layer_modal.js"></script>
-    <script src="/pwa_gis_tracking/static/js/advanced_query.js"></script>
     <script src="/pwa_gis_tracking/static/js/detail.js"></script>
 
     <script>
@@ -790,58 +769,10 @@
     </script>
 
 
-    <!-- ═══ Chatbot "น้องหนึ่งน้ำ" ═══ -->
-    <button id="chatbotFab" class="pulse" onclick="toggleChatbot()" title="สอบถามข้อมูล GIS กับน้องหนึ่งน้ำ">
-      <i class="fa-solid fa-comments fab-icon"></i>
-    </button>
+    <script>
 
-    <div id="chatbotPanel">
-      <div class="chatbot-header">
-        <div class="chatbot-avatar">
-          <i class="fa-solid fa-droplet" style="color: var(--pwa-blue-dark)"></i>
-        </div>
-        <div class="chatbot-header-text">
-          <div class="chatbot-title">น้องหนึ่งน้ำ</div>
-          <div class="chatbot-subtitle">ผู้ช่วย GIS (อยู่ในระหว่างการพัฒนา)</div>
-        </div>
-        <button onclick="toggleChatbot()" class="chatbot-close">&times;</button>
-      </div>
-
-      <div id="chatMessages" class="chatbot-messages">
-        <div class="chat-msg bot">
-          <div class="chat-bubble">
-            สวัสดีค่ะ! สอบถามข้อมูล GIS กับน้องหนึ่งน้ำได้เลยค่ะ
-            <br /><br />ตัวอย่างคำถาม:
-            <ul>
-              <li onclick="askSuggestion('แสดงตำแหน่งหัวดับเพลิงทั้งหมดสาขาหนองเรือ')">แสดงตำแหน่งหัวดับเพลิงทั้งหมดสาขาหนองเรือ</li>
-              <li onclick="askSuggestion('จำนวนมาตรวัดน้ำทั้งหมดในสาขาเชียงใหม่')">จำนวนมาตรวัดน้ำทั้งหมดในสาขาเชียงใหม่</li>
-              <li onclick="askSuggestion('ท่อขนาด 100 มม. สาขาหาดใหญ่ ยาวรวมกี่เมตร')">ท่อขนาด 100 มม. สาขาหาดใหญ่ ยาวรวมกี่เมตร</li>
-              <li onclick="askSuggestion('ขอรายชื่อสาขาทั้งหมดในเขต 2')">ขอรายชื่อสาขาทั้งหมดในเขต 2</li>
-              <li onclick="askSuggestion('จำนวนมาตรตายสาขารังสิต')">จำนวนมาตรตายสาขารังสิต</li>
-              <li onclick="askSuggestion('จำนวนจุดซ่อมท่อขนาด 100 ขึ้นไปแยกตามชนิด ขนาด สาขารังสิต')">จำนวนจุดซ่อมท่อขนาด 100 ขึ้นไปแยกตามชนิด ขนาด สาขารังสิต</li>
-              <li onclick="askSuggestion('ความยาวท่อจ่ายน้ำขนาด 100 ขึ้นไป อายุมากกว่า 30 ปี สาขาพัทยา')">ความยาวท่อจ่ายน้ำขนาด 100 ขึ้นไป อายุมากกว่า 30 ปี สาขาพัทยา</li>
-              <li onclick="askSuggestion('แสดงตำแหน่งข้อมูลสถานีผลิตโรงกรองน้ำทุกสาขา')">แสดงตำแหน่งข้อมูลสถานีผลิตโรงกรองน้ำทุกสาขา</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-
-      <div class="chatbot-input-area">
-        <input
-          type="text"
-          id="chatInput"
-          placeholder="พิมพ์คำถามที่นี่..."
-          onkeypress="if(event.key==='Enter')sendChatMessage()"
-          maxlength="500"
-          autocomplete="off"
-        />
-        <button id="chatSendBtn" onclick="sendChatMessage()" class="chatbot-send" title="ส่ง">
-          <i class="fa-solid fa-paper-plane"></i>
-        </button>
-      </div>
-    </div>
-
-    <script src="/pwa_gis_tracking/static/js/chatbot.js"></script>
+      
+    </script>
 
   </body>
 </html>

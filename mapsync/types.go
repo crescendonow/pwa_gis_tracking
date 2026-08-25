@@ -55,4 +55,30 @@ type SyncState struct {
 	LastSuccessAt  *time.Time
 	Status         string
 	LastError      string
+	// CursorID resumes an interrupted full scan from the last checkpointed
+	// document instead of restarting the collection from the beginning.
+	CursorID string
+	// FullStartedAt pins when the current full pass began. A full pass that
+	// resumes across cycles writes rows with several different synced_at
+	// values, so RemoveAbsent must compare against this instead of the
+	// current segment's clock or it would delete every row the earlier
+	// segments wrote. Nil when no full pass is in progress.
+	FullStartedAt *time.Time
+}
+
+// Cursor tells a Source whether to read incrementally (Since set) or as a
+// full scan, optionally resuming a full scan already in progress (AfterID).
+type Cursor struct {
+	Since   *time.Time // nil = full scan
+	AfterID string     // full-scan resume point (Mongo ObjectID hex)
+}
+
+// DMAColor is one DMA boundary's browser-safe fill/stroke colour, sourced
+// from the authoritative PostGIS database and mirrored into pwa_tracking_map
+// so the tile function never has to reach across servers.
+type DMAColor struct {
+	PwaCode string
+	DMAID   string
+	Fill    string
+	Stroke  string
 }

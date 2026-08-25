@@ -308,6 +308,31 @@
     background: rgba(34, 197, 94, 0.2);
 }
 
+/* ── Retry with LLM Button (Req 3) ───────── */
+.chat-retry-llm {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: rgba(62, 186, 150, 0.1);
+    border: 1px solid rgba(62, 186, 150, 0.3);
+    border-radius: 8px;
+    color: var(--pwa-gold);
+    font-size: 12px;
+    font-weight: 600;
+    font-family: 'Noto Sans Thai', 'Poppins', sans-serif;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.chat-retry-llm:hover {
+    background: rgba(62, 186, 150, 0.2);
+    box-shadow: 0 2px 8px rgba(62, 186, 150, 0.25);
+}
+.chat-retry-llm:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
 /* ── Input Area ──────────────────────────── */
 .chatbot-input-area {
     display: flex;
@@ -359,6 +384,15 @@
     opacity: 0.5;
     cursor: not-allowed;
     transform: none;
+}
+
+/* ── Chatbot Map-Only Mode (Req 4) ───────────
+   ใช้เมื่อผู้ใช้ถามคำถามตำแหน่งจาก chatbot ก่อนที่จะเคยกด "ค้นหา" —
+   #resultsSection มีการ์ดสถิติ/กราฟ/ตาราง/export ที่ยังว่างอยู่ ต้องซ่อนไว้
+   เหลือแต่การ์ดแผนที่ (#detailMapContainer) จนกว่าจะมีการค้นหาจริง
+   (ถอด class นี้ออกใน static/js/detail.js เมื่อกด "ค้นหา") */
+#resultsSection.chatbot-map-only > *:not(#detailMapContainer) {
+    display: none !important;
 }
 
 /* ── Responsive ──────────────────────────── */

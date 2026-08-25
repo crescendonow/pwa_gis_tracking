@@ -32,6 +32,35 @@ func TestNormalizeDMAColorsUsesFallbackForUnsafeValues(t *testing.T) {
 	if fill != DefaultDMAFill {
 		t.Fatalf("unknown CSS name should use fallback, got %q", fill)
 	}
+	// Empty values (e.g. a NULL sld_color_fill column, as read by
+	// DMAColorSource.Load) must fall back rather than pass an empty string
+	// through to the browser-rendered style.
+	fill, stroke = NormalizeDMAColors("", "")
+	if fill != DefaultDMAFill || stroke != DefaultDMAStroke {
+		t.Fatalf("empty values = %q, %q, want both fallbacks", fill, stroke)
+	}
+	// A syntactically valid colour passes through unchanged.
+	fill, stroke = NormalizeDMAColors("#123456", "rgba(1,2,3,0.5)")
+	if fill != "#123456" || stroke != "rgba(1,2,3,0.5)" {
+		t.Fatalf("valid colours changed: got %q, %q", fill, stroke)
+	}
+}
+
+func TestIsRollupPwaCode(t *testing.T) {
+	cases := []struct {
+		code string
+		want bool
+	}{
+		{"5511000", true},
+		{"5511011", false},
+		{"000", false},
+		{"", false},
+	}
+	for _, tc := range cases {
+		if got := IsRollupPwaCode(tc.code); got != tc.want {
+			t.Fatalf("IsRollupPwaCode(%q) = %v, want %v", tc.code, got, tc.want)
+		}
+	}
 }
 
 func TestTransformFeatureUsesFeaturePwaCodeBeforeCollectionAlias(t *testing.T) {

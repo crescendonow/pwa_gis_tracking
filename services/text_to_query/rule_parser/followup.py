@@ -10,6 +10,8 @@ from .detectors import (
     detect_pipe_function, detect_meter_status, detect_inch_size,
     detect_age, detect_year_range, detect_exclude_sleeve,
 )
+from .mappings.fields import size_field, type_field, is_numeric_size, size_value
+from .mappings.meter import cust_stat_filter
 
 
 def parse_followup(text, prev_context):
@@ -34,7 +36,7 @@ def parse_followup(text, prev_context):
     # ── Detect modifiers from text ──────────────────────
     size = detect_size(text)
     size_gte = detect_size_gte(text)
-    pipe_type = detect_pipe_type(text) if layer == "pipe" else None
+    pipe_type = detect_pipe_type(text) if layer in ("pipe", "leakpoint") else None
     pipe_func_id, pipe_func_label = detect_pipe_function(text) if layer == "pipe" else (None, None)
     meter_stat_id, meter_stat_label = detect_meter_status(text) if layer == "meter" else (None, None)
     inch_size = detect_inch_size(text)
@@ -71,24 +73,33 @@ def parse_followup(text, prev_context):
     else:
         prev_match = {}
 
-    # Add new filters
+    # Add new filters — ชนิดข้อมูลต้องตรงกับที่ DB เก็บจริง (ดู mappings/fields.py)
     if pipe_type:
-        prev_match["properties.typeId"] = pipe_type
-    if pipe_func_id:
-        prev_match["properties.functionId"] = pipe_func_id
-    if size and not size_gte:
-        prev_match["properties.sizeId"] = size
-    if size_gte:
-        prev_match["$expr"] = {"$gte": [{"$toInt": "$properties.sizeId"}, int(size_gte)]}
+        tf = type_field(layer)
+        if tf:
+            prev_match[tf] = pipe_type
+    if pipe_func_id is not None:
+        prev_match["properties.functionId"] = int(pipe_func_id)
+
+    sf = size_field(layer)
+    if sf:
+        if is_numeric_size(layer):
+            if size_gte:
+                prev_match[sf] = {"$gte": int(size_gte)}
+            elif size:
+                prev_match[sf] = size_value(layer, size)
+        elif size and not size_gte:
+            prev_match[sf] = size_value(layer, size)
+
     if meter_stat_id:
-        prev_match["properties.custStat"] = meter_stat_id
+        prev_match["properties.custStat"] = cust_stat_filter(meter_stat_id)
     if age and layer == "pipe":
         cutoff_year = datetime.now().year + 543 - age
         prev_match["properties.yearInstall"] = {"$lte": cutoff_year}
     if year_range and layer == "pipe":
         prev_match["properties.yearInstall"] = year_range
     if exclude_sleeve:
-        prev_match["properties.functionId"] = {"$ne": "6"}
+        prev_match["properties.functionId"] = {"$ne": 6}
 
     # Rebuild pipeline
     if operation == "aggregate":

@@ -10,6 +10,8 @@ Usage:
 
 import sys
 import os
+import json
+from datetime import datetime
 
 # Ensure the service directory is on the path
 sys.path.insert(0, os.path.dirname(__file__))
@@ -118,7 +120,9 @@ def test_pipe_total_length_with_function():
     pipeline = r["query"]["mongo"]["pipeline"]
     match_stage = pipeline[0]
     match = match_stage.get("$match", match_stage)
-    assert match.get("properties.functionId") == "1"
+    # functionId เก็บเป็น int ใน DB จริง (verified 2026-08-22) — ไม่ใช่ string
+    assert match.get("properties.functionId") == 1
+    assert not isinstance(match.get("properties.functionId"), str)
 
 
 def test_pipe_total_length_exclude_sleeve():
@@ -129,7 +133,8 @@ def test_pipe_total_length_exclude_sleeve():
     pipeline = r["query"]["mongo"]["pipeline"]
     match_stage = pipeline[0]
     match = match_stage.get("$match", match_stage)
-    assert match.get("properties.functionId") == {"$ne": "6"}
+    # functionId เป็น int ใน DB — $ne ต้องเทียบกับ int เช่นกัน
+    assert match.get("properties.functionId") == {"$ne": 6}
 
 
 # ═══════════════════════════════════════════════════════════
@@ -178,6 +183,39 @@ def test_group_by_compound():
 
 
 # ═══════════════════════════════════════════════════════════
+# 3b. Type-correctness regression guards (note/18_plan_for_edit_text_to_sql.md §5.1)
+# ═══════════════════════════════════════════════════════════
+
+def test_leakpoint_uses_correct_size_field():
+    r = _assert_rule(
+        "จำนวนจุดซ่อมท่อขนาด 100 ขึ้นไปแยกตามชนิด ขนาด", "5541026",
+        _rule_matched="group_by",
+    )
+    raw = json.dumps(r["query"]["mongo"]["pipeline"], ensure_ascii=False, default=str)
+    assert "pipeSizeId" in raw
+    assert "pipeSizesId" not in raw          # ← regression guard
+    assert "$toInt" not in raw
+
+
+def test_size_filter_is_numeric():
+    r = _assert_rule("ท่อ AC ขนาด 100 มม. กี่ท่อ", "5541026")
+    m = r["query"]["mongo"]["pipeline"][0]
+    assert m["properties.sizeId"] == 100      # int ไม่ใช่ "100"
+
+
+def test_pipe_function_is_int():
+    r = _assert_rule("ความยาวท่อจ่ายน้ำรวม สาขารังสิต", "5541026")
+    m = r["query"]["mongo"]["pipeline"][0]["$match"]
+    assert m["properties.functionId"] == 2
+
+
+def test_date_filter_is_datetime():
+    r = _assert_rule("จุดแตกรั่วปี 2567", "5541026")
+    v = r["query"]["mongo"]["pipeline"][0]["properties.leakDatetime"]
+    assert isinstance(v["$gte"], datetime)
+
+
+# ═══════════════════════════════════════════════════════════
 # 4. Show position (geojson)
 # ═══════════════════════════════════════════════════════════
 
@@ -221,7 +259,8 @@ def test_count_meter_status():
     assert r["query"]["mongo"]["layer"] == "meter"
     pipeline = r["query"]["mongo"]["pipeline"]
     filt = pipeline[0]
-    assert filt.get("properties.custStat") == "3"
+    # custStat ใน DB ส่วนใหญ่เป็น string แต่บาง instance อาจเป็น int — ต้อง match ได้ทั้งคู่
+    assert filt.get("properties.custStat") == {"$in": ["3", 3]}
 
 
 def test_count_with_filter():

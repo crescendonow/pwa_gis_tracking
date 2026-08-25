@@ -141,7 +141,7 @@ var FieldMapping = map[string]map[string]string{
 		"checker":         "leakchecker",
 		"pipeId":          "pipe_id",
 		"pipeTypeId":      "pipe_type",
-		"pipeSizesId":     "pipe_size",
+		"pipeSizeId":      "pipe_size",
 		"informer":        "leak_informer",
 		"pwaCode":         "pwa_code",
 		"recordDate":      "rec_date",

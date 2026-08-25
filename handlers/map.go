@@ -105,7 +105,19 @@ func GetMapTile(c *gin.Context) {
 		return
 	}
 	defer response.Body.Close()
-	if response.StatusCode != http.StatusOK {
+	switch response.StatusCode {
+	case http.StatusOK:
+		// fall through to forward the tile below
+	case http.StatusNoContent, http.StatusNotFound:
+		// Martin has no data (or no source) for this tile/query. That is a
+		// normal "empty" result, distinct from the tile service being down.
+		// AbortWithStatus (not Status) forces gin to actually write the
+		// header now instead of deferring it to a body write that never
+		// happens, which would otherwise leave the response at Go's default
+		// 200.
+		c.AbortWithStatus(http.StatusNoContent)
+		return
+	default:
 		c.JSON(http.StatusBadGateway, gin.H{"error": "tile service unavailable"})
 		return
 	}

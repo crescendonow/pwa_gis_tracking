@@ -16,7 +16,7 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from starlette.responses import JSONResponse
 
-from config import PORT, RATE_LIMIT, GEMINI_MODEL
+from config import PORT, RATE_LIMIT, OPENROUTER_MODEL
 from cache import get_cached, set_cached
 from rule_parser import parse_rule, parse_followup
 from intent import generate_query_intent
@@ -25,6 +25,7 @@ from validators import validate_sql, validate_mongo_pipeline
 from executors.mongo_executor import execute_mongo, execute_mongo_multi
 from executors.postgis_executor import execute_postgis
 from formatters import format_response
+from coercion import coerce_pipeline
 
 logging.basicConfig(
     level=logging.INFO,
@@ -150,7 +151,10 @@ def _fix_pipeline_fields(pipeline):
         "useTypeId", "building", "floor", "villageNo", "village", "soi",
         "road", "subDistrict", "district", "province", "zipcode",
         "leakNo", "leakDatetime", "cause", "repairBy", "repairCost",
-        "repairDatetime", "pipeTypeId", "pipeSizesId", "LeakStatus",
+        # หมายเหตุ: "pipeSizeId" คือชื่อ field ที่ถูกต้อง (verified 2026-08-22) — การแก้ไขชื่อ
+        # ที่สะกดผิด เช่น "pipeSizesId" → "pipeSizeId" หรือ "LeakStatus" → ไม่มี field นี้ ทำโดย
+        # coerce_pipeline() ใน coercion.py แทน (รันต่อจากฟังก์ชันนี้)
+        "repairDatetime", "pipeTypeId", "pipeSizeId",
         "DATASOURCE", "pwaStationId", "name", "pwaAddress", "waterResource",
         "dmaNo", "dmaName", "mmNo",
     }
@@ -192,6 +196,7 @@ class QueryRequest(BaseModel):
     pwa_code: str = Field(default="")
     uid: str = Field(default="")
     permission: str = Field(default="")
+    force_llm: bool = Field(default=False)
 
 
 # ── Endpoints ────────────────────────────────────────
@@ -200,8 +205,8 @@ async def health():
     from config import pg_engine, mongo_db
     return {
         "status": "Text-to-Query service is running",
-        "llm_provider": "gemini",
-        "model": GEMINI_MODEL,
+        "llm_provider": "openrouter",
+        "model": OPENROUTER_MODEL,
         "postgis_connected": pg_engine is not None,
         "mongodb_connected": mongo_db is not None,
         "branches_loaded": len(_code_to_name),
@@ -233,6 +238,10 @@ async def text_to_query(req: QueryRequest, request: Request):
         raise HTTPException(400, detail="prompt is required")
 
     pwa_code = req.pwa_code.strip()
+    force_llm = bool(req.force_llm)
+    # cache key แยกกันระหว่างคำตอบปกติกับคำตอบที่ผู้ใช้สั่งให้ถาม AI โดยตรง
+    # (Req 3: ผู้ใช้เลือกใช้ LLM เองได้เมื่อ rule ตอบไม่ตรง — กัน cache ทับกัน)
+    cache_prompt = prompt + ("|llm" if force_llm else "")
 
     # 0. Resolve branch name → pwa_code from prompt
     #    e.g., "สาขาพระพุทธบาท" → "1080", "ชลบุรี" → "5531011"
@@ -241,45 +250,56 @@ async def text_to_query(req: QueryRequest, request: Request):
         log.info("Branch resolved from prompt: %s → pwa_code=%s", prompt[:40], resolved_code)
         pwa_code = resolved_code
 
-    # 1. Cache check
-    cached = get_cached(prompt, pwa_code)
+    # 1. Cache check — ข้ามตอน force_llm (ผู้ใช้ต้องการคำตอบใหม่จาก AI เสมอ)
+    cached = None if force_llm else get_cached(cache_prompt, pwa_code)
     if cached is not None:
         cached["metadata"]["cached"] = True
         log.info("Cache HIT for: %s", prompt[:60])
         return cached
 
-    # 2. Rule-based parser (fast path < 100ms, covers ~80% of use cases)
-    intent = parse_rule(prompt, pwa_code)
+    intent = None
     used_rule = False
-    if intent is not None:
-        rule_name = intent.pop("_rule_matched", "unknown")
-        zone = intent.pop("_zone", None)
-        nationwide = intent.pop("_nationwide", False)
-        log.info("Rule-based match [%s] for: %s", rule_name, prompt[:60])
-        used_rule = True
+    rule_name = None
+    zone = None
+    nationwide = False
+
+    if force_llm:
+        # ข้าม rule parser ทั้งหมด — ผู้ใช้กด "ถามใหม่ด้วย AI" โดยตรง
+        log.info("force_llm requested for: %s", prompt[:60])
+        try:
+            intent = await generate_query_intent(prompt, pwa_code)
+        except Exception as exc:
+            log.error("LLM error: %s", exc)
+            raise HTTPException(502, detail="ไม่สามารถเชื่อมต่อ LLM ได้ค่ะ: {}".format(str(exc)))
     else:
-        zone = None
-        nationwide = False
+        # 2. Rule-based parser (fast path < 100ms, covers ~80% of use cases)
+        intent = parse_rule(prompt, pwa_code)
+        if intent is not None:
+            rule_name = intent.pop("_rule_matched", "unknown")
+            zone = intent.pop("_zone", None)
+            nationwide = intent.pop("_nationwide", False)
+            log.info("Rule-based match [%s] for: %s", rule_name, prompt[:60])
+            used_rule = True
+        else:
+            # 2b. Follow-up detection: merge with previous context
+            prev_ctx = _get_context(pwa_code) if pwa_code else None
+            if prev_ctx:
+                intent = parse_followup(prompt, prev_ctx)
+                if intent:
+                    rule_name = intent.pop("_rule_matched", "followup")
+                    zone = intent.pop("_zone", None)
+                    nationwide = intent.pop("_nationwide", False)
+                    log.info("Follow-up match [%s] for: %s (prev layer=%s)",
+                             rule_name, prompt[:60], prev_ctx.get("layer"))
+                    used_rule = True
 
-        # 2b. Follow-up detection: merge with previous context
-        prev_ctx = _get_context(pwa_code) if pwa_code else None
-        if prev_ctx:
-            intent = parse_followup(prompt, prev_ctx)
-            if intent:
-                rule_name = intent.pop("_rule_matched", "followup")
-                zone = intent.pop("_zone", None)
-                nationwide = intent.pop("_nationwide", False)
-                log.info("Follow-up match [%s] for: %s (prev layer=%s)",
-                         rule_name, prompt[:60], prev_ctx.get("layer"))
-                used_rule = True
-
-        # 3. LLM → intent + query (fallback)
-        if intent is None:
-            try:
-                intent = await generate_query_intent(prompt, pwa_code)
-            except Exception as exc:
-                log.error("LLM error: %s", exc)
-                raise HTTPException(502, detail="ไม่สามารถเชื่อมต่อ LLM ได้ค่ะ: {}".format(str(exc)))
+            # 3. LLM → intent + query (fallback)
+            if intent is None:
+                try:
+                    intent = await generate_query_intent(prompt, pwa_code)
+                except Exception as exc:
+                    log.error("LLM error: %s", exc)
+                    raise HTTPException(502, detail="ไม่สามารถเชื่อมต่อ LLM ได้ค่ะ: {}".format(str(exc)))
 
     if intent is None:
         raise HTTPException(
@@ -287,8 +307,19 @@ async def text_to_query(req: QueryRequest, request: Request):
             detail="ไม่สามารถเข้าใจคำถามได้ค่ะ กรุณาลองถามใหม่ เช่น 'จำนวนหัวดับเพลิงทั้งหมด'",
         )
 
-    # Post-validation: fix common LLM hallucinations
-    intent = _sanitize_intent(intent)
+    # Post-validation: fix common LLM hallucinations — ใช้กับ intent จาก LLM เท่านั้น
+    # rule parser สร้าง pipeline ที่ typed ถูกต้องแล้ว (int/datetime ตรงกับ DB จริง) การ
+    # round-trip ผ่าน JSON ใน _fix_pipeline_fields() จะทำลาย datetime object กลับเป็น string
+    if not used_rule:
+        intent = _sanitize_intent(intent)
+        query_for_coercion = intent.get("query", {})
+        mongo_q_for_coercion = query_for_coercion.get("mongo", {})
+        if mongo_q_for_coercion.get("pipeline"):
+            mongo_q_for_coercion["pipeline"] = coerce_pipeline(
+                mongo_q_for_coercion["pipeline"], mongo_q_for_coercion.get("layer", "")
+            )
+            query_for_coercion["mongo"] = mongo_q_for_coercion
+            intent["query"] = query_for_coercion
 
     target_db = intent.get("target_db", "mongo")
     response_type = intent.get("response_type", "table")
@@ -477,11 +508,13 @@ async def text_to_query(req: QueryRequest, request: Request):
         pwa_code=pwa_code,
         execution_time_ms=elapsed_ms,
         cached=False,
-        model="rule-based" if used_rule else GEMINI_MODEL,
+        model="rule-based" if used_rule else OPENROUTER_MODEL,
+        rule_matched=rule_name if used_rule else None,
+        can_retry_llm=used_rule,
     )
 
     # 6. Cache store
-    set_cached(prompt, pwa_code, response)
+    set_cached(cache_prompt, pwa_code, response)
 
     return response
 
@@ -491,6 +524,9 @@ def _is_empty_result(result_data, response_type):
     if result_data is None:
         return True
     if isinstance(result_data, dict):
+        # dict ที่มีแต่ "message" (เช่น {"message": "ไม่พบข้อมูลค่ะ"}) ถือว่าว่างเสมอ
+        if set(result_data.keys()) == {"message"}:
+            return True
         # numeric: value == 0 or None
         if response_type == "numeric":
             val = result_data.get("value")
@@ -504,25 +540,30 @@ def _is_empty_result(result_data, response_type):
     return False
 
 
+def _json_default(o):
+    """json.dumps 'default' handler — รองรับ datetime และค่าอื่นที่ serialize ตรงไม่ได้."""
+    return o.isoformat() if hasattr(o, "isoformat") else str(o)
+
+
 def _format_mongo_display(operation, layer, pipeline):
     """Build a readable MongoDB query string for display."""
     import json
     if operation == "aggregate":
         return "db.features_<{layer}>.aggregate({pipeline})".format(
             layer=layer,
-            pipeline=json.dumps(pipeline, ensure_ascii=False, indent=2),
+            pipeline=json.dumps(pipeline, ensure_ascii=False, indent=2, default=_json_default),
         )
     elif operation == "count":
         filt = pipeline[0] if pipeline else {}
         return "db.features_<{layer}>.countDocuments({filt})".format(
             layer=layer,
-            filt=json.dumps(filt, ensure_ascii=False, indent=2),
+            filt=json.dumps(filt, ensure_ascii=False, indent=2, default=_json_default),
         )
     else:
         filt = pipeline[0] if pipeline else {}
-        return "db.features_<{layer}>.find({filt}).limit(1000)".format(
+        return "db.features_<{layer}>.find({filt})".format(
             layer=layer,
-            filt=json.dumps(filt, ensure_ascii=False, indent=2),
+            filt=json.dumps(filt, ensure_ascii=False, indent=2, default=_json_default),
         )
 
 

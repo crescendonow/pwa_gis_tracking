@@ -7,9 +7,29 @@ import json
 import logging
 
 from bson import ObjectId
-from config import mongo_db
+from config import mongo_db, MAX_GEOJSON_FEATURES
 
 log = logging.getLogger("text_to_query")
+
+
+def _feature_cursor(collection, filt):
+    """cursor สำหรับ find — ไม่จำกัดจำนวน ยกเว้นตั้ง MAX_GEOJSON_FEATURES ไว้ (0 = ไม่จำกัด)"""
+    cur = collection.find(filt)
+    if MAX_GEOJSON_FEATURES > 0:
+        cur = cur.limit(MAX_GEOJSON_FEATURES)
+    return cur
+
+
+def _geojson_meta(collection, filt, fetched):
+    """
+    คืน (total_count, truncated) สำหรับผลลัพธ์แบบ geojson
+    ถ้าไม่ชน cap → total = จำนวนที่ดึงมาได้จริง
+    ถ้าชน cap    → นับจำนวนจริงใน DB เพิ่ม เพื่อบอกผู้ใช้ว่า "พบ X แสดง Y แรก"
+    """
+    if not (MAX_GEOJSON_FEATURES and fetched >= MAX_GEOJSON_FEATURES):
+        return fetched, False
+    total = collection.count_documents(filt)
+    return total, total > fetched
 
 
 def _find_collection_id(pwa_code, layer):
@@ -105,7 +125,7 @@ def execute_mongo(pwa_code, layer, operation, pipeline, response_type):
     else:
         # find operation
         filt = pipeline[0] if pipeline else {}
-        cursor = collection.find(filt).limit(1000)
+        cursor = _feature_cursor(collection, filt)
         docs = list(cursor)
 
         if response_type == "geojson":
@@ -123,9 +143,12 @@ def execute_mongo(pwa_code, layer, operation, pipeline, response_type):
                     "geometry": geom,
                     "properties": safe_props,
                 })
+            total, truncated = _geojson_meta(collection, filt, len(docs))
             return {
                 "type": "FeatureCollection",
                 "features": features,
+                "total_count": total,
+                "truncated": truncated,
             }
 
         elif response_type == "table":
@@ -159,7 +182,13 @@ def execute_mongo(pwa_code, layer, operation, pipeline, response_type):
                 continue
             props = {k: _safe_val(v) for k, v in doc.get("properties", {}).items()}
             features.append({"type": "Feature", "geometry": geom, "properties": props})
-        return {"type": "FeatureCollection", "features": features}
+        total, truncated = _geojson_meta(collection, filt, len(docs))
+        return {
+            "type": "FeatureCollection",
+            "features": features,
+            "total_count": total,
+            "truncated": truncated,
+        }
 
 
 def _safe_val(v):
@@ -236,6 +265,7 @@ def execute_mongo_multi(pwa_codes, layer, operation, pipeline, response_type):
     all_columns = set()
     found_count = 0
     skipped = []
+    truncated = False
 
     for code in pwa_codes:
         try:
@@ -265,8 +295,13 @@ def execute_mongo_multi(pwa_codes, layer, operation, pipeline, response_type):
                         result_label = key
 
         elif operation == "find":
+            # หยุดสะสมเมื่อครบ cap — ไม่ query สาขาที่เหลือต่อ
+            if MAX_GEOJSON_FEATURES and (len(all_features) + len(all_rows)) >= MAX_GEOJSON_FEATURES:
+                truncated = True
+                break
+
             filt = pipeline[0] if pipeline else {}
-            docs = list(collection.find(filt).limit(200))
+            docs = list(_feature_cursor(collection, filt))
             if response_type == "geojson":
                 for doc in docs:
                     geom = doc.get("geometry")
@@ -293,7 +328,13 @@ def execute_mongo_multi(pwa_codes, layer, operation, pipeline, response_type):
             "_branches_skipped": len(skipped),
         }
     elif response_type == "geojson":
-        return {"type": "FeatureCollection", "features": all_features}
+        total = len(all_features)
+        return {
+            "type": "FeatureCollection",
+            "features": all_features,
+            "total_count": total,
+            "truncated": truncated or bool(MAX_GEOJSON_FEATURES and total >= MAX_GEOJSON_FEATURES),
+        }
     elif response_type == "table":
         return {"columns": sorted(all_columns), "rows": all_rows[:500], "row_count": len(all_rows)}
 
